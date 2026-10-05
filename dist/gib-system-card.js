@@ -7,4 +7,4 @@ export const systemCard=`
 <p>Not used: Gambling 3NT, Namyats, Bergen, DONT or Puppet Stayman.</p>
 <h3>About this table</h3><p>These are independent practice bots with heuristic bidding and play, not BBO’s proprietary GIB simulation engine. Both your table and the four-bot comparison use these agreements. Bots cannot see concealed hands.</p>
 <p>Where the notes name a convention without specifying every continuation, this table uses standard treatments, including <em>slow shows</em> Lebensohl. Rare or unspecified sequences use natural bidding. This is not a claim of identical decisions to BBO’s robots.</p>
-<p>Select an auction call to read its meaning. On a computer, hovering over a denomination previews how the bots will interpret your bid.</p>`;
+<p>Select an auction call to read its meaning. Before bidding, choose a level, then press and hold a suit or NT for its meaning in the current auction. Release to keep reading; no bid is placed. A quick tap places the bid. With a keyboard, focus a suit or NT and press F1 to inspect it.</p>`;

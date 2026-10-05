@@ -82,6 +82,7 @@
  .mobile-menu-list{display:grid;gap:8px;margin-top:16px}.mobile-menu-list button{min-height:46px;text-align:left;padding:10px 12px;font-size:16px;background:#e8eee3;color:#284b35;border-radius:5px}.mobile-menu-list button:disabled{opacity:.4}
  .toast{top:calc(60px + env(safe-area-inset-top,0px));bottom:auto;max-width:calc(100% - 24px);width:max-content;line-height:1.5;font-size:14px;padding:12px 16px}
 }
+
 @media(max-width:700px) and (max-height:740px){
  :root{--mobile-card-height:84px}
  .table{min-height:205px;flex-basis:205px}.trick-grid{width:180px;height:190px}.trick-card{width:62px;height:88px;min-width:62px;font-size:26px}.trick-card .suit{font-size:23px}.trick-card .pip{font-size:23px}.trick-card.n,.trick-card.s{left:59px}.trick-card.e,.trick-card.w{top:51px}.seat-north{top:3px}.seat-south{bottom:3px}
@@ -114,4 +115,22 @@
  .table:is(.west-dummy,.east-dummy) .trick-card .suit,.table:is(.west-dummy,.east-dummy) .trick-card .pip{font-size:23px}
  .table:is(.west-dummy,.east-dummy) .trick-card.n,.table:is(.west-dummy,.east-dummy) .trick-card.s{left:59px}
  .table:is(.west-dummy,.east-dummy) .trick-card.e,.table:is(.west-dummy,.east-dummy) .trick-card.w{top:51px}
+}
+
+@media(max-width:700px){
+ body[data-phase="complete"] .table{display:block;flex:0 0 auto;min-height:0;height:auto;padding:0;border-radius:0}
+ body[data-phase="complete"] #mobile-bidding,body[data-phase="complete"] .hand-zone{display:none}
+ #completed-deal{padding:12px 8px 14px}
+ .completed-deal-heading{margin-bottom:9px}
+ .revealed-hands{gap:9px 10px}
+ .revealed-hand{padding:7px 6px}
+ .revealed-north,.revealed-south{width:100%;min-width:0;max-width:330px}
+ .revealed-hand-heading{gap:3px;margin-bottom:4px}
+ .revealed-hand-heading strong{font-size:14px}.revealed-hand-heading>span{font-size:12px}
+ .revealed-suit{gap:3px}.revealed-cards{gap:2px}
+ .completed-results{display:none}
+ body[data-phase="complete"] .completed-results{display:block;padding:0 8px 12px;background:var(--mobile-felt)}
+ .completed-results .controls{padding:14px;border-radius:7px;background:#f6f8ef;color:#244334}
+ .completed-results .controls h3{font-size:17px;margin:0}
+ .completed-results .small-button{min-height:44px;font-size:14px}
 }

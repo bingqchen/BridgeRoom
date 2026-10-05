@@ -34,7 +34,7 @@ test('manifest has installable icons and a scoped standalone start URL',async()=
 test('service worker serves the whole app and download with the network unavailable',async()=>{
  const w=await worker();await w.lifecycle('install');await w.lifecycle('activate');assert.equal(await w.ready(),true);assert.equal(w.claimed,true);w.setOffline();
  assert((await (await w.fetchPath('/')).text()).includes('The Bridge Room'));
- for(const path of ['/app.js','/engine.js','/gib-system.js','/session.js','/offline.js','/style.css','/mobile.css','/icons/icon-192.png','/fonts/dm-sans-400.ttf','/bridge-room-offline.html'])assert((await w.fetchPath(path)).ok,path);
+ for(const path of ['/app.js','/bid-preview.js','/completed-deal.js','/engine.js','/gib-system.js','/session.js','/offline.js','/style.css','/mobile.css','/icons/icon-192.png','/fonts/dm-sans-400.ttf','/bridge-room-offline.html'])assert((await w.fetchPath(path)).ok,path);
  assert((await (await w.fetchPath('/?launch=home')).text()).includes('The Bridge Room'));
  assert.equal(await w.fetchPath('/unknown'),undefined);assert.equal(await w.fetchPath('/app.js','POST'),undefined);
  assert(w.requested.every(r=>r.redirect==='error'&&r.cache==='reload'));

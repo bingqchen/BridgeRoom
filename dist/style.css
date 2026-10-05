@@ -124,3 +124,30 @@ body[data-phase="bidding"] #controls{padding-top:18px}
 .footer-actions{display:flex;gap:14px;align-items:center;flex-shrink:0}.deal-option{display:flex;align-items:flex-start;gap:12px;padding:16px 12px;background:#edf1e6;border:1px solid #c7d3bc;border-radius:6px;cursor:pointer}.deal-option input{width:22px;height:22px;margin:2px 0 0;flex:0 0 22px;accent-color:#245139}.deal-option strong{display:block;font-size:16px}.deal-option small{display:block;font-size:14px;line-height:1.6;margin-top:6px;color:#51664b}
 
 .deal-actions:has(#claim-button:not([hidden])){grid-template-columns:repeat(4,minmax(0,1fr))}.deal-actions #claim-button:not(:disabled){background:#f3dfa4;border-color:#bd963a;color:#3a4023}.claim-note{font-size:14px;line-height:1.6;padding:10px 12px;background:#e9eedc;border-left:3px solid #b9984f;color:#33512f}
+
+#controls [data-suit]{touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+#dialog-body .bid-meaning-reason{font-size:16px;line-height:1.65;margin-top:0}
+.bid-meaning-details{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 18px;font-size:16px;line-height:1.5;margin:20px 0}
+.bid-meaning-details:empty{display:none}
+.bid-meaning-details dt{color:#576952}.bid-meaning-details dd{margin:0;font-weight:600;text-align:right}
+#dialog-body .bid-meaning-note{font-size:14px;color:#596e57}
+
+/* Finished deals use a compact compass layout, entirely inside the felt. */
+body[data-phase="complete"] .table{height:auto;min-height:0;border-radius:24px}
+body[data-phase="complete"] .table>.seat,body[data-phase="complete"] .table-center,body[data-phase="complete"] .table-inset,body[data-phase="complete"] .hand-zone{display:none}
+#completed-deal[hidden]{display:none}
+#completed-deal{padding:18px 22px 22px;color:#f5f7ed}
+.completed-deal-heading{text-align:center;font-size:14px;color:#cfdfc8;margin-bottom:12px}
+.revealed-hands{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px 24px;max-width:580px;margin:auto}
+.revealed-hand{min-width:0;padding:9px 10px;border:1px solid #ffffff25;background:#0b302b55;border-radius:8px}
+.revealed-north,.revealed-south{grid-column:1/-1;width:min(100%,340px);justify-self:center}
+.revealed-fan{display:flex;gap:2px}
+.revealed-fan .review-card{flex:1 1 21px;min-width:17px}
+.revealed-hand-heading{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:7px;flex-wrap:wrap}
+.revealed-hand-heading strong{font-size:14px;font-weight:600}.revealed-hand-heading>span{font-size:12px;color:#ccdcc7;white-space:nowrap}
+.revealed-suit{display:flex;gap:5px;align-items:flex-start;margin-top:3px}
+.revealed-suit-label{width:15px;flex:0 0 15px;font:20px/30px Georgia,serif;color:#f5f7ed}.revealed-suit.red .revealed-suit-label{color:#ffada4}
+.revealed-cards{display:flex;flex-wrap:wrap;gap:2px;min-width:0;min-height:30px}
+.review-card{display:flex;flex-direction:column;justify-content:center;align-items:center;flex:0 0 21px;width:21px;height:30px;border:1px solid #c8d2c4;border-radius:3px;background:#fffef8;color:#17271f;font:14px/14px Arial,sans-serif;box-shadow:0 1px 2px #0002}
+.review-card b{font-size:14px;line-height:14px}.review-card>span{font-size:12px;line-height:12px}.review-card.red{color:#b12c34}
+.revealed-void{font-size:15px;line-height:30px;color:#cfdfc8}

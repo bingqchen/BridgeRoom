@@ -2,7 +2,7 @@
 
 A browser bridge game with no runtime dependencies with one human and three practice bots. The complete single-file offline download is `dist/bridge-room-offline.html`. For the installable web version, serve `dist/` over HTTPS (or localhost for development), or run `node server.mjs` and open http://127.0.0.1:4173/.
 
-You sit South and partner North. You control both North/South hands when your side declares. When South is dummy, the table rotates 180°: North’s declaring hand moves to the main hand area at the bottom, South’s dummy appears at the top after the opening lead, and East/West and trick cards rotate with them. After the opening lead, West’s dummy appears vertically on the left when East declares, and East’s dummy appears vertically on the right when West declares. Both work on mobile and desktop with trumps first at the top. South stays at the bottom. The next auction restores the South view. The game enforces legal calls, following suit, declarer selection, opening lead, dummy exposure, trick winners, and duplicate scoring with the standard board vulnerability cycle. On screens up to 700px wide, the app uses a full-height mobile table with full-width dummy and player card rows, a contract/trick status bar, the full auction in the center, two-row bidding controls, and an action bar for auction history and hints. Choose a level to reveal the suits and NT; tapping a denomination places the bid. The same Double control changes to Redouble when legal. Menu holds the remaining controls. The session is held in memory and resets on refresh.
+You sit South and partner North. You control both North/South hands when your side declares. When South is dummy, the table rotates 180°: North’s declaring hand moves to the main hand area at the bottom, South’s dummy appears at the top after the opening lead, and East/West and trick cards rotate with them. After the opening lead, West’s dummy appears vertically on the left when East declares, and East’s dummy appears vertically on the right when West declares. Both work on mobile and desktop with trumps first at the top. South stays at the bottom. The next auction restores the South view. The game enforces legal calls, following suit, declarer selection, opening lead, dummy exposure, trick winners, and duplicate scoring with the standard board vulnerability cycle. On screens up to 700px wide, the app uses a full-height mobile table with full-width dummy and player card rows, a contract/trick status bar, the full auction in the center, two-row bidding controls, and an action bar for auction history and hints. Choose a level to reveal the suits and NT; tapping a denomination places the bid. Press and hold a suit or NT for about half a second to read its auction-specific GIB meaning, including available point ranges, suit lengths and forcing status. Releasing a held button does not bid; close the explanation and tap when ready. F1 or Shift+F10 on a focused denomination also opens the explanation. The same Double control changes to Redouble when legal. Menu holds the remaining controls. The session is held in memory and resets on refresh.
 
 ## Install and play offline
 
@@ -13,6 +13,10 @@ Open **Get app** on desktop, or **Menu → Get app · play offline** on mobile. 
 For source changes, install development dependencies with `pnpm install`, then run `pnpm build` before publishing. Esbuild is a build-only dependency; the game makes no runtime API calls. The build generates the standalone HTML and a content-versioned `dist/sw.js`. It embeds local JavaScript modules through a virtual resolver, without scanning directories outside the project. The worker caches only its explicit asset list, rejects redirected setup requests, verifies cache completeness, and replaces only older Bridge Room caches. Updates do not reload an active game.
 
 Fonts are bundled locally under their SIL Open Font Licenses in `dist/fonts/`; the same licenses are embedded in the standalone download. Icons are local PNGs with a maskable variant for installation.
+
+## Completed-board display
+
+When a board ends, all four original hands appear automatically inside the table as miniature cards, with North above, South below, West left and East right. Suit colors alternate and trumps stay first. Each hand shows its HCP and declarer/dummy role. This also works for passed-out boards and accepted claims. On mobile, the duplicate result appears below the hands. Undoing a completed board or replaying it hides the revealed deal again.
 
 ## Deal controls
 
@@ -66,6 +70,8 @@ Run `node --test tests/*.test.mjs`. Covers auction legality, doubles and redoubl
 - `dist/engine.js`: deals, play progression and bot entry points
 - `dist/play-rules.js`: legal cards, trick winners and duplicate scoring
 - `dist/card-play.js`: public-information sampling, rollouts and score-based card advice
+- `dist/completed-deal.js`: compact four-hand reveal after a board finishes
+- `dist/bid-preview.js`: safe tap/hold and keyboard bid inspection
 - `dist/turn-state.js`: active-seat detection
 - `dist/claim.js`: distribution-independent claim verification and scoring
 - `dist/gib-system.js`: GIB-style bidding dispatcher

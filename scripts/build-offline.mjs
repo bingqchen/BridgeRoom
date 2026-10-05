@@ -21,10 +21,10 @@ const licenses=(await read('fonts/DM-Sans-OFL.txt'))+'\n'+await read('fonts/Libr
 let html=await read('index.html');
 html=html.replace('<html lang="en">','<html lang="en" data-offline-bundle>')
  .replace(/<link[^>]+(?:rel="manifest"|rel="apple-touch-icon")[^>]*>/g,'')
- .replace('<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="mobile.css">',`<style>${css.replaceAll('</style','<\\/style')}</style>`)
+ .replace('<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="mobile.css">',()=>`<style>${css.replaceAll('</style','<\\/style')}</style>`)
  .replace('<a class="brand" href="./">','<a class="brand" href="#">')
- .replace('<script type="module" src="app.js"></script>',`<script>${bundle.outputFiles[0].text.replaceAll('</script','<\\/script')}</script>`)
- .replace('</body>',`<template id="font-licenses">${licenses.replaceAll('&','&amp;').replaceAll('<','&lt;')}</template></body>`);
+ .replace('<script type="module" src="app.js"></script>',()=>`<script>${bundle.outputFiles[0].text.replaceAll('</script','<\\/script')}</script>`)
+ .replace('</body>',()=>`<template id="font-licenses">${licenses.replaceAll('&','&amp;').replaceAll('<','&lt;')}</template></body>`);
 await writeFile(path.join(dist,'bridge-room-offline.html'),html);
 async function files(dir=''){
  const entries=await readdir(path.join(dist,dir),{withFileTypes:true});
