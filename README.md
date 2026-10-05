@@ -20,9 +20,17 @@ When a board ends, all four original hands appear automatically inside the table
 
 ## Deal controls
 
-Undo, Play again, and Skip stay below the hand on desktop and mobile. Undo restores the state before your last bid, card or claim and removes any subsequent bot moves; repeated undo also works for cards played from dummy, across trick collection, and after a completed board. Play again uses the same original cards, seats, dealer and vulnerability and restarts the auction. Skip advances the board, dealer and vulnerability cycle. Undo history is cleared when replaying or skipping, so it never crosses boards.
+Undo, Play again, and Skip stay below the hand on desktop and mobile. Undo restores the state before your last bid, card or claim and removes any subsequent bot moves; repeated undo also works for cards played from dummy, across trick collection, and after a completed board. Play again uses the same original cards, seats, dealer and vulnerability and restarts the auction, or the chosen contract for a custom deal. Skip advances to a random board with the next board's dealer and vulnerability cycle. Undo history is cleared when replaying or skipping, so it never crosses boards.
 
 Undoing or replaying a completed board removes only that board’s score and IMP contribution. Finishing it again records its new result once. Skipping an unfinished board adds no result, while skipping a finished board keeps its result. Pending bot actions are cancelled before restoring or replacing the deal.
+
+## Custom hands and deal library
+
+Open **Deal library** in the desktop header or mobile **Menu**. Choose **Enter a deal** and type each player's ranks into the four suit fields. Both `T` and `10` are accepted; blank or a dash means a void. Live counts and HCP help check the hands. Every card must appear exactly once and each seat must have 13 cards before play or saving is enabled. After entering three complete hands, **Fill empty hand** assigns the remaining 13 cards to the fourth seat. **Copy current deal** opens all four original hands in the editor, including cards already played.
+
+Choose dealer and vulnerability, then start from bidding or set a contract, declarer and double status. Starting a deal replaces the current table and clears its undo history while preserving completed-board session totals. Entered seats are never reshuffled by the South-highest-HCP preference. Chosen contracts begin with the proper opening leader and keep dummy hidden until the lead; Play again returns to the same contract. For these deals the four-bot comparison plays the same contract, while deals started from bidding are rebid independently as usual.
+
+Name the deal and choose **Save deal** to add it to a library of up to 200 deals. Saved deals can be played, edited or removed with an undo option. The library is stored locally in this browser and survives refreshes, including offline use when browser storage is available. It does not sync between devices or between the website and a downloaded HTML file. **Export library** and **Import library** transfer or back up the collection as JSON; **Download deal** saves a single deal even when browser storage is unavailable. Import validates the entire file before saving, skips identical records and keeps both copies on a conflicting ID. Clearing browser data removes the library, so export a backup first. Unsaved editor drafts last only until the page is refreshed.
 
 ## Guaranteed claims
 
@@ -78,6 +86,8 @@ Every legal card is still simulated after the opening lead. Defensive preference
 
 Run `node --test tests/*.test.mjs`. Covers auction legality, doubles and redoubles, declarer selection, following suit, trump rules, vulnerability, scoring cases, 2/1 applicability, forcing 1NT rebids, Stayman/transfers, GIB convention sequences and continuations, and 500 deterministic complete games. Duplicate-comparison tests also replay 64 boards and verify identical bot decisions and isolated state. Card-play tests check exact card counts and observed voids, auction-weighted samples, hidden-hand independence, declarer/dummy knowledge, finesse and third-hand endings, and turn transitions. Claim tests cover ruffs, finesses, bad breaks, blocked suits, void inference, partial tricks, bounded-search refusal, score/undo behavior and an independent exhaustive oracle for small endings. Offline tests verify bundled assets, install metadata and service-worker cache behavior without a network. Session tests cover undo across bidding/play and completed tricks, repeated score accounting, replay identity, passed-out boards and skip boundaries.
 
+Deal-library tests cover input normalization, duplicate/missing-card rejection, fourth-hand completion, persistence and safe import, corrupt or unavailable storage, concurrent-tab protection, fixed seat identity, preset contracts and their full four-bot play, undo/replay and score boundaries.
+
 ## Source layout
 
 - `dist/bridge-cards.js`: shared card, auction and contract rules
@@ -87,6 +97,8 @@ Run `node --test tests/*.test.mjs`. Covers auction legality, doubles and redoubl
 - `dist/defense.js`: defensive tactics, guarded discards and soft public-signal inference
 - `dist/card-play.js`: public-information sampling, rollouts and score-based card advice
 - `dist/completed-deal.js`: compact four-hand reveal after a board finishes
+- `dist/deal-library.js`: custom-deal validation, setup and local library persistence/import/export
+- `dist/deal-library-ui.js`: four-hand editor, saved-deal library and backup controls
 - `dist/bid-preview.js`: safe tap/hold and keyboard bid inspection
 - `dist/turn-state.js`: active-seat detection
 - `dist/claim.js`: distribution-independent claim verification and scoring

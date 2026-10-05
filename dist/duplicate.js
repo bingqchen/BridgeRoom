@@ -1,4 +1,5 @@
 import {botBid,botCard,makeCall,playCard,collectTrick} from './engine.js';
+import {replayDeal} from './session.js';
 
 // Lower bounds of the standard ACBL IMP scale (one comparison per board).
 // https://www.acbl.org/learn/ — International Match Point Scoring (IMP)
@@ -10,11 +11,8 @@ export function pointsToIMPs(difference){
 }
 
 export function playBotBoard(deal){
- // Start a separate auction from the original deal, never the remaining cards.
- const table={board:deal.board,dealer:deal.dealer,vulnerable:[...deal.vulnerable],
-  hands:structuredClone(deal.originalHands),originalHands:structuredClone(deal.originalHands),
-  auction:[],phase:'bidding',turn:deal.dealer,contract:null,trick:[],history:[],
-  tricks:[0,0],dummyExposed:false,result:null};
+ // Replay original cards and an optional practice contract at a separate table.
+ const table=replayDeal(deal);
  let steps=0;
  while(table.phase!=='complete'){
   if(++steps>512)throw Error('The bot comparison could not finish.');

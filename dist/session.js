@@ -2,9 +2,11 @@ import {createDeal} from './engine.js';
 
 // Restart from the saved deal, never from the cards still left in players' hands.
 export function replayDeal(deal){
+ const contract=deal.startContract?structuredClone(deal.startContract):null;
  return {board:deal.board,dealer:deal.dealer,vulnerable:[...deal.vulnerable],
   hands:structuredClone(deal.originalHands),originalHands:structuredClone(deal.originalHands),
-  auction:[],phase:'bidding',turn:deal.dealer,contract:null,trick:[],history:[],
+  ...(deal.dealName?{dealName:deal.dealName}:{}),...('startContract' in deal?{startContract:structuredClone(contract)}:{}),
+  auction:[],phase:contract?'play':'bidding',turn:contract?(contract.declarer+1)%4:deal.dealer,contract,trick:[],history:[],
   tricks:[0,0],dummyExposed:false,result:null};
 }
 
@@ -36,6 +38,10 @@ export class TableSession {
  skip(state,rng,options){
   // Completed boards stay in the session; incomplete boards add nothing.
   const next=createDeal(state.board+1,rng,options);
+  return this.start(next);
+ }
+ start(next){
+  // A loaded library deal is a new board, just like Skip. Keep prior results.
   this.snapshots=[];
   this.score=null;
   this.comparison=null;
