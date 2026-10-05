@@ -1,4 +1,4 @@
-import {SUITS,side,partner} from './bridge-cards.js';
+import {SUITS,side,partner,hcp} from './bridge-cards.js';
 const suits=SUITS.slice(0,4);
 const sorted=cards=>[...cards].sort((a,b)=>b.rank-a.rank);
 
@@ -78,14 +78,30 @@ export function openingLeadPlan(view){
     o.suitReason=o.length===longest?'Develop a longest available suit.':'Develop a long suit with touching honors.';
    }
   }
+  // The additional defense lesson favors safety against notrump slams and
+  // finding partner's entries when our own long suit cannot realistically run.
+  if(contract.level>=6){
+   for(const o of options){
+    const h=groups[o.card.suit],safeRun=h.length>=3&&h[0].rank===h[1].rank+1&&h[1].rank===h[2].rank+1;
+    if(h.every(c=>c.rank<=10)||safeRun){o.priority=o.length>=3?5:4;o.suitReason='Choose a passive lead against a notrump slam; avoid giving away an honor trick.';}
+    if(contract.level===7&&h[0].rank===14){Object.assign(o,{card:h[0],method:'cash-ace',fourthBest:false,priority:6,reason:'Cash the ace before declarer can take thirteen tricks.',suitReason:'One defensive trick defeats a grand slam.'});}
+   }
+  }else if(!partnerOptions.length&&hcp(hand)<=3){
+   for(const o of available)if(o.length>=3&&o.length<=4){o.priority=3;o.suitReason='With few entries, try to establish a suit partner can run.';}
+  }
  }else{
+  const naturalTrumpTricks=groups[trump]?.length&&groups[trump].every(c=>c.rank>=10);
+  const urgent=contract.level===6||auction.some(c=>c.seat===contract.dummy&&Object.entries(c.lengths||{}).some(([s,n])=>s!==trump&&n>=5));
   for(const o of options){
    if(o.partnerSuit&&!o.isTrump){o.priority=3;o.suitReason='Attack a suit supported by partner.';}
    else if(o.sequence&&!o.isTrump){o.priority=3;o.suitReason='Establish side-suit tricks behind touching honors.';}
-   else if(o.length===1&&!o.isTrump&&hasTrumps&&entry(o.card.suit)){o.priority=o.unbid?3:2;o.suitReason='A singleton, trumps and a quick entry offer a ruffing chance.';}
+   else if(o.length===1&&!o.isTrump&&hasTrumps&&!naturalTrumpTricks&&entry(o.card.suit)&&o.card.rank<11){o.priority=o.unbid?3:2;o.suitReason='A singleton, trumps and a quick entry offer a ruffing chance.';}
    else if(o.isTrump&&dummyShort&&!o.fragileTrump){o.priority=3;o.suitReason='Dummy advertised shortness; remove ruffing power.';}
    else{o.priority=(o.unbid&&!o.riskyAce&&!o.isTrump||o.isTrump&&!o.fragileTrump)?1:0;o.suitReason=o.isTrump?'A trump is the passive alternative.':'No more attractive attacking lead is available.';}
    if(o.riskyAce&&!o.partnerSuit)o.priority=-1;
+   const h=groups[o.card.suit];
+   if(urgent&&o.priority<3&&!o.isTrump&&o.unbid&&!o.riskyAce&&h.length>=3&&h[0].rank>=12&&h[1].rank>=9){o.priority=2;o.suitReason='Attack an unbid suit with useful intermediates before declarer establishes discards.';}
+   if(o.length<=2&&o.card.rank>=11&&o.card.rank<=13&&!o.sequence&&!o.partnerSuit&&!o.isTrump)o.priority=-1;
   }
  }
  const priority=Math.max(...options.map(o=>o.priority));

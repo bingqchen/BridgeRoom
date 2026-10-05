@@ -2,6 +2,7 @@ import {SUITS,side,partner,hcp,shape,balanced} from './bridge-cards.js';
 import {totalPoints} from './bidding-context.js';
 import {legalCards,scoreContract} from './play-rules.js';
 import {openingLeadPlan,openingLeadLogWeight,ruleOfEleven} from './opening-leads.js';
+import {defensePlan,selectDefensiveOption,signalObservations,signalLogWeight} from './defense.js';
 
 const deck=SUITS.slice(0,4).flatMap(suit=>Array.from({length:13},(_,i)=>({suit,rank:i+2,id:suit+(i+2)})));
 const encode=c=>SUITS.indexOf(c.suit)*13+c.rank-2;
@@ -113,8 +114,9 @@ export function sampleDeals(view,{samples=32,rng=random(seedFor(view))}={}){
  const k=knowledge(view),draw=allocationSampler(k),models=auctionModels(view.auction||[]);
  const first=view.history[0]?.cards[0]||view.trick[0];
  const inferLead=first&&first.seat===(view.contract.declarer+1)%4&&k.unknown.includes(first.seat);
+ const signals=signalObservations(view);
  const count=k.unknown.length?Math.max(1,Math.min(128,Math.floor(samples))):1;
- const worlds=Array.from({length:count*4},()=>{const hands=draw(rng);return {hands,logWeight:logLikelihood(hands,k,models)+(inferLead?openingLeadLogWeight(first,[...hands[first.seat],...k.played[first.seat]],view.contract.suit):0)};});
+ const worlds=Array.from({length:count*4},()=>{const hands=draw(rng);return {hands,logWeight:logLikelihood(hands,k,models)+signalLogWeight(hands,signals,k.unknown,view.contract)+(inferLead?openingLeadLogWeight(first,[...hands[first.seat],...k.played[first.seat]],view.contract.suit):0)};});
  const max=Math.max(...worlds.map(w=>w.logWeight));
  const weights=worlds.map(w=>Math.exp(w.logWeight-max)),total=weights.reduce((a,b)=>a+b,0);
  // Systematic resampling spends the rollout budget on plausible deals while
@@ -131,7 +133,7 @@ const cost=(c,hand,trump)=>points(c)*5+rank(c)/15+(suit(c)===trump?5:0)-hand.fil
 
 // Cheap continuation policy used only inside hypothetical deals. It preserves
 // honors, protects partner's winner, cashes established suits, and draws trumps.
-function rolloutCard(hands,trick,seat,trump,declaringSide){
+function rolloutCard(hands,trick,seat,trump,declaringSide,contract,defenseTaken){
  const hand=hands[seat],cards=legal(hand,trick);
  if(cards.length===1)return cards[0];
  const cheap=[...cards].sort((a,b)=>cost(a,hand,trump)-cost(b,hand,trump));
@@ -139,6 +141,13 @@ function rolloutCard(hands,trick,seat,trump,declaringSide){
   const lead=suit(trick[0].card),win=trick.reduce((a,b)=>strength(a.card,lead,trump)>=strength(b.card,lead,trump)?a:b);
   const later=Array.from({length:3-trick.length},(_,i)=>(seat+i+1)%4).filter(s=>side(s)!==side(seat));
   const safe=c=>later.every(s=>legal(hands[s],trick).every(x=>strength(x,lead,trump)<=strength(c,lead,trump)));
+  if(side(seat)!==declaringSide&&trump===4&&side(trick[0].seat)===declaringSide&&defenseTaken+1<8-contract.level){
+   const follow=cards.filter(c=>suit(c)===lead),ace=follow.find(c=>rank(c)===14),low=follow.find(c=>rank(c)<10);
+   const dummy=hands[contract.dummy],long=dummy.filter(c=>suit(c)===lead);
+   const shortLeft=hands[contract.declarer].filter(c=>suit(c)===lead).length-(later.includes(contract.declarer)?1:0);
+   const outsideEntry=dummy.some(c=>suit(c)!==lead&&hands.every(h=>h.every(x=>suit(x)!==suit(c)||rank(x)<=rank(c))));
+   if(ace&&low&&long.length>=3&&long.some(c=>rank(c)>=11)&&shortLeft>0&&shortLeft<long.length&&!outsideEntry)return low;
+  }
   if(side(win.seat)===side(seat)&&safe(win.card))return cheap[0];
   const winners=cheap.filter(c=>strength(c,lead,trump)>strength(win.card,lead,trump));
   return winners.find(safe)||(side(win.seat)!==side(seat)?winners[0]:null)||cheap[0];
@@ -171,12 +180,12 @@ function solveEnding(hands,trick,turn,trump,declaringSide,alpha=-1,beta=3){
 }
 function rollout(world,view,first){
  const hands=world.map(h=>h.map(encode).sort((a,b)=>a-b)),trump=SUITS.indexOf(view.contract.suit),declaringSide=side(view.contract.declarer);
- let trick=view.trick.map(x=>({seat:x.seat,card:encode(x.card)})),turn=view.seat,taken=0,next=encode(first),remaining=hands.reduce((n,h)=>n+h.length,0);
+ let trick=view.trick.map(x=>({seat:x.seat,card:encode(x.card)})),turn=view.seat,taken=0,defenseTaken=view.history.filter(t=>side(t.winner)!==declaringSide).length,next=encode(first),remaining=hands.reduce((n,h)=>n+h.length,0);
  while(remaining){
   if(next===null&&remaining+trick.length<=8)return taken+solveEnding(hands,trick,turn,trump,declaringSide);
-  const c=next??rolloutCard(hands,trick,turn,trump,declaringSide);next=null;
+  const c=next??rolloutCard(hands,trick,turn,trump,declaringSide,view.contract,defenseTaken);next=null;
   hands[turn].splice(hands[turn].indexOf(c),1);trick.push({seat:turn,card:c});remaining--;
-  if(trick.length===4){turn=winner(trick,trump);if(side(turn)===declaringSide)taken++;trick=[];}else turn=(turn+1)%4;
+  if(trick.length===4){turn=winner(trick,trump);if(side(turn)===declaringSide)taken++;else defenseTaken++;trick=[];}else turn=(turn+1)%4;
  }
  return taken;
 }
@@ -188,12 +197,16 @@ export function analyzePlay(input,{samples=32}={}){
  if(cards.length===1)return {card:cards[0],samples:0,options:[],forced:true};
  const worlds=sampleDeals(view,{samples}),declaringSide=side(view.contract.declarer),us=side(view.seat),already=view.history.filter(t=>side(t.winner)===declaringSide).length;
  const leadPlan=openingLeadPlan(view),candidates=leadPlan?leadPlan.candidates.map(o=>o.card):cards;
+ const defensive=leadPlan?null:defensePlan(view);
  const options=candidates.map(card=>{
   let score=0,made=0,tricks=0;
   for(const world of worlds){const count=already+rollout(world,view,card);tricks+=count;made+=count>=view.contract.level+6?1:0;score+=scoreContract(view.contract,count,view.vulnerable).score*(us===declaringSide?1:-1);}
   const openingLead=leadPlan?.candidates.find(o=>o.card.id===card.id);
   return {card,expectedScore:score/worlds.length,makeProbability:made/worlds.length,expectedTricks:tricks/worlds.length,...(openingLead?{leadMethod:openingLead.method,reason:openingLead.suitReason+' '+openingLead.reason}: {})};
  }).sort((a,b)=>b.expectedScore-a.expectedScore||(us===declaringSide?b.expectedTricks-a.expectedTricks:a.expectedTricks-b.expectedTricks)||a.card.rank-b.card.rank||encode(a.card)-encode(b.card));
+ const preferred=selectDefensiveOption(options,defensive,{exact:view.hand.length<=2});
+ if(preferred!==options[0]){options.splice(options.indexOf(preferred),1);options.unshift(preferred);}
+ const tactic=defensive?.preferences.get(options[0].card.id);
  const chosen=leadPlan?.candidates.find(o=>o.card.id===options[0].card.id);
- return {card:options[0].card,samples:worlds.length,options,forced:false,...(chosen?{openingLead:{system:leadPlan.system,method:chosen.method,reason:options[0].reason,ruleOfEleven:chosen.fourthBest&&view.contract.suit==='N'?ruleOfEleven(chosen.card):null}}:{})};
+ return {card:options[0].card,samples:worlds.length,options,forced:false,...(defensive?{defense:{system:defensive.system,method:tactic?.method||'statistical-defense',reason:tactic?.reason||'Compare defensive continuations using the public cards, auction and signal clues.',observedSignals:defensive.observedSignals}}:{}),...(chosen?{openingLead:{system:leadPlan.system,method:chosen.method,reason:options[0].reason,ruleOfEleven:chosen.fourthBest&&view.contract.suit==='N'?ruleOfEleven(chosen.card):null}}:{})};
 }

@@ -66,6 +66,14 @@ The opening-lead policy follows [BridgePlaybook’s guide](https://bridgeplayboo
 
 Fourth-best is our agreement from four or more small cards; three small cards use middle-up-down. Takeout doubles suggest unbid suits rather than naming one. Artificial calls contribute only the holdings their meanings actually show. Hints explain the recommendation and, for a fourth-best notrump lead, show the Rule of 11 count. Observed opening leads softly weight sampled holdings, including the fourth-best count; they never rule out a deal solely because a human may have led differently. Actual concealed hands remain inaccessible. Subsequent leads retain the existing card-play search.
 
+## Defensive play and signals
+
+Additional defensive heuristics draw on the five-chapter excerpt of [25 Ways to Be a Better Defender](https://sites.utoronto.ca/bridge/lessons/25defense.pdf). They cover second-hand low, splitting touching honors against dummy's intermediates, third-hand high with the lowest of equals, finessing against dummy, retaining guards, and notrump hold-ups. Opening suit selection also considers passive notrump slam leads, attacking suit-slam leads, weak-hand entries and risky short honors. The earlier BridgePlaybook opening-rank agreements remain unchanged where the sources differ; this is not an implementation of every deal or all 25 chapters of the book.
+
+On partner's honor lead and on discards, high spots encourage and low spots discourage. On declarer's lead, a high spot starts even count and a low spot starts odd count. Only relative spots below the ten are used, trumps are excluded, and forced cards provide no inference. Each first signal of a given type/suit softly weights sampled hidden holdings reconstructed at that moment; later echoes and the duplicated current/history trick are not counted twice. All players can interpret the same public signals, and human departures from convention remain possible. Signals are never added to the guaranteed-claim proof.
+
+Every legal card is still simulated after the opening lead. Defensive preferences apply only within 6 expected points and 0.10 expected tricks of the best-scoring option, without reducing the sampled probability of defeating the contract; exact two-trick endings use the search directly. Hypothetical continuations can hold up an ace to interrupt a long dummy suit, but take an immediately available setting trick. These thresholds and tactical patterns are heuristics, not calibrated improvements or expert-level guarantees. Hints explain applicable tactics, and the same engine serves all three bots, advice and the duplicate table offline.
+
 ## Validation
 
 Run `node --test tests/*.test.mjs`. Covers auction legality, doubles and redoubles, declarer selection, following suit, trump rules, vulnerability, scoring cases, 2/1 applicability, forcing 1NT rebids, Stayman/transfers, GIB convention sequences and continuations, and 500 deterministic complete games. Duplicate-comparison tests also replay 64 boards and verify identical bot decisions and isolated state. Card-play tests check exact card counts and observed voids, auction-weighted samples, hidden-hand independence, declarer/dummy knowledge, finesse and third-hand endings, and turn transitions. Claim tests cover ruffs, finesses, bad breaks, blocked suits, void inference, partial tricks, bounded-search refusal, score/undo behavior and an independent exhaustive oracle for small endings. Offline tests verify bundled assets, install metadata and service-worker cache behavior without a network. Session tests cover undo across bidding/play and completed tricks, repeated score accounting, replay identity, passed-out boards and skip boundaries.
@@ -76,6 +84,7 @@ Run `node --test tests/*.test.mjs`. Covers auction legality, doubles and redoubl
 - `dist/engine.js`: deals, play progression and bot entry points
 - `dist/play-rules.js`: legal cards, trick winners and duplicate scoring
 - `dist/opening-leads.js`: opening-lead conventions, auction-aware candidate suits and conditional lead inference
+- `dist/defense.js`: defensive tactics, guarded discards and soft public-signal inference
 - `dist/card-play.js`: public-information sampling, rollouts and score-based card advice
 - `dist/completed-deal.js`: compact four-hand reveal after a board finishes
 - `dist/bid-preview.js`: safe tap/hold and keyboard bid inspection
