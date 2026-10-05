@@ -1,6 +1,7 @@
 import {SUITS,side,partner,hcp,shape,balanced} from './bridge-cards.js';
 import {totalPoints} from './bidding-context.js';
 import {legalCards,scoreContract} from './play-rules.js';
+import {openingLeadPlan,openingLeadLogWeight,ruleOfEleven} from './opening-leads.js';
 
 const deck=SUITS.slice(0,4).flatMap(suit=>Array.from({length:13},(_,i)=>({suit,rank:i+2,id:suit+(i+2)})));
 const encode=c=>SUITS.indexOf(c.suit)*13+c.rank-2;
@@ -110,8 +111,10 @@ function logLikelihood(hands,k,models){
 
 export function sampleDeals(view,{samples=32,rng=random(seedFor(view))}={}){
  const k=knowledge(view),draw=allocationSampler(k),models=auctionModels(view.auction||[]);
+ const first=view.history[0]?.cards[0]||view.trick[0];
+ const inferLead=first&&first.seat===(view.contract.declarer+1)%4&&k.unknown.includes(first.seat);
  const count=k.unknown.length?Math.max(1,Math.min(128,Math.floor(samples))):1;
- const worlds=Array.from({length:count*4},()=>{const hands=draw(rng);return {hands,logWeight:logLikelihood(hands,k,models)};});
+ const worlds=Array.from({length:count*4},()=>{const hands=draw(rng);return {hands,logWeight:logLikelihood(hands,k,models)+(inferLead?openingLeadLogWeight(first,[...hands[first.seat],...k.played[first.seat]],view.contract.suit):0)};});
  const max=Math.max(...worlds.map(w=>w.logWeight));
  const weights=worlds.map(w=>Math.exp(w.logWeight-max)),total=weights.reduce((a,b)=>a+b,0);
  // Systematic resampling spends the rollout budget on plausible deals while
@@ -184,10 +187,13 @@ export function analyzePlay(input,{samples=32}={}){
  if(!cards.length||view.trick.length===4)throw Error('There is no card to play.');
  if(cards.length===1)return {card:cards[0],samples:0,options:[],forced:true};
  const worlds=sampleDeals(view,{samples}),declaringSide=side(view.contract.declarer),us=side(view.seat),already=view.history.filter(t=>side(t.winner)===declaringSide).length;
- const options=cards.map(card=>{
+ const leadPlan=openingLeadPlan(view),candidates=leadPlan?leadPlan.candidates.map(o=>o.card):cards;
+ const options=candidates.map(card=>{
   let score=0,made=0,tricks=0;
   for(const world of worlds){const count=already+rollout(world,view,card);tricks+=count;made+=count>=view.contract.level+6?1:0;score+=scoreContract(view.contract,count,view.vulnerable).score*(us===declaringSide?1:-1);}
-  return {card,expectedScore:score/worlds.length,makeProbability:made/worlds.length,expectedTricks:tricks/worlds.length};
+  const openingLead=leadPlan?.candidates.find(o=>o.card.id===card.id);
+  return {card,expectedScore:score/worlds.length,makeProbability:made/worlds.length,expectedTricks:tricks/worlds.length,...(openingLead?{leadMethod:openingLead.method,reason:openingLead.suitReason+' '+openingLead.reason}: {})};
  }).sort((a,b)=>b.expectedScore-a.expectedScore||(us===declaringSide?b.expectedTricks-a.expectedTricks:a.expectedTricks-b.expectedTricks)||a.card.rank-b.card.rank||encode(a.card)-encode(b.card));
- return {card:options[0].card,samples:worlds.length,options,forced:false};
+ const chosen=leadPlan?.candidates.find(o=>o.card.id===options[0].card.id);
+ return {card:options[0].card,samples:worlds.length,options,forced:false,...(chosen?{openingLead:{system:leadPlan.system,method:chosen.method,reason:options[0].reason,ruleOfEleven:chosen.fourthBest&&view.contract.suit==='N'?ruleOfEleven(chosen.card):null}}:{})};
 }

@@ -58,7 +58,13 @@ The active seat has a gold outline and explicit To play / To bid label. The acti
 
 Bots and card hints use 32 Monte Carlo samples per decision, selected from 128 candidate hidden deals. Only the acting hand, exposed dummy, public auction and played cards enter the view. When dummy acts, declarer also knows their own hand. Observed voids and remaining hand sizes are hard constraints. Suit allocations are drawn using multinomial completion counts, giving a uniform prior over feasible assignments; public HCP, total-point and suit-length bidding meanings then provide soft likelihood weights. Artificial calls use their described target lengths, not the denomination of the call. Bidding remains the existing GIB-style system.
 
-Every legal card is evaluated on the same sampled deals. Full-hand rollouts use a lightweight continuation policy; the final two tricks use exact partnership minimax within each hypothetical deal. The selected card maximizes average duplicate score for the acting partnership, including contract bonuses, vulnerability and penalties. Ties prefer expected tricks and then a lower card. Hints show the leading options, estimated make/defeat percentages and expected points. Percentages describe the sampled model, not calibrated guarantees or a double-dummy solution to the actual deal. Monte Carlo bridge play has known imperfect-information limitations; see [Ginsberg's bridge search paper](https://arxiv.org/abs/1106.0669) for background. No actual hidden cards are supplied to the search, and everything works offline.
+During later play, every legal card is evaluated on the same sampled deals. At the opening lead, the search compares conventional candidates selected by the lead agreements below. Full-hand rollouts use a lightweight continuation policy; the final two tricks use exact partnership minimax within each hypothetical deal. The selected card maximizes average duplicate score for the acting partnership, including contract bonuses, vulnerability and penalties. Ties prefer expected tricks and then a lower card. Hints show the leading options, estimated make/defeat percentages and expected points. Percentages describe the sampled model, not calibrated guarantees or a double-dummy solution to the actual deal. Monte Carlo bridge play has known imperfect-information limitations; see [Ginsberg's bridge search paper](https://arxiv.org/abs/1106.0669) for background. No actual hidden cards are supplied to the search, and everything works offline.
+
+## Opening-lead agreements
+
+The opening-lead policy follows [BridgePlaybook’s guide](https://bridgeplaybook.com/bridge-strategy/opening-leads/). It chooses a conventional rank in each suitable suit, then compares those candidates using the existing public-information simulations. Suit selection is a heuristic interpretation of the guide, not a complete expert defense system. The same policy powers bots, hints and the duplicate table.
+
+Fourth-best is our agreement from four or more small cards; three small cards use middle-up-down. Takeout doubles suggest unbid suits rather than naming one. Artificial calls contribute only the holdings their meanings actually show. Hints explain the recommendation and, for a fourth-best notrump lead, show the Rule of 11 count. Observed opening leads softly weight sampled holdings, including the fourth-best count; they never rule out a deal solely because a human may have led differently. Actual concealed hands remain inaccessible. Subsequent leads retain the existing card-play search.
 
 ## Validation
 
@@ -69,6 +75,7 @@ Run `node --test tests/*.test.mjs`. Covers auction legality, doubles and redoubl
 - `dist/bridge-cards.js`: shared card, auction and contract rules
 - `dist/engine.js`: deals, play progression and bot entry points
 - `dist/play-rules.js`: legal cards, trick winners and duplicate scoring
+- `dist/opening-leads.js`: opening-lead conventions, auction-aware candidate suits and conditional lead inference
 - `dist/card-play.js`: public-information sampling, rollouts and score-based card advice
 - `dist/completed-deal.js`: compact four-hand reveal after a board finishes
 - `dist/bid-preview.js`: safe tap/hold and keyboard bid inspection
