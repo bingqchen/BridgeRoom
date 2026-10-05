@@ -1,0 +1,87 @@
+# The Bridge Room
+
+A browser bridge game with no runtime dependencies with one human and three practice bots. The complete single-file offline download is `dist/bridge-room-offline.html`. For the installable web version, serve `dist/` over HTTPS (or localhost for development), or run `node server.mjs` and open http://127.0.0.1:4173/.
+
+You sit South and partner North. You control both North/South hands when your side declares. When South is dummy, the table rotates 180°: North’s declaring hand moves to the main hand area at the bottom, South’s dummy appears at the top after the opening lead, and East/West and trick cards rotate with them. After the opening lead, West’s dummy appears vertically on the left when East declares, and East’s dummy appears vertically on the right when West declares. Both work on mobile and desktop with trumps first at the top. South stays at the bottom. The next auction restores the South view. The game enforces legal calls, following suit, declarer selection, opening lead, dummy exposure, trick winners, and duplicate scoring with the standard board vulnerability cycle. On screens up to 700px wide, the app uses a full-height mobile table with full-width dummy and player card rows, a contract/trick status bar, the full auction in the center, two-row bidding controls, and an action bar for auction history and hints. Choose a level to reveal the suits and NT; tapping a denomination places the bid. The same Double control changes to Redouble when legal. Menu holds the remaining controls. The session is held in memory and resets on refresh.
+
+## Install and play offline
+
+Open **Get app** on desktop, or **Menu → Get app · play offline** on mobile. The service worker caches the complete app, local fonts, icons, bidding modules and downloadable HTML. Wait for “Ready for offline play”, then install via the offered browser prompt or the browser’s Add to Home Screen / Install app menu. The first visit needs a connection; subsequent launches, games, bot bidding/play and duplicate comparisons work offline. Cache setup fails closed if a file cannot be downloaded or redirects (for example, to a sign-in page).
+
+**Download offline file** saves one HTML file with the JavaScript, styles, fonts and font licenses embedded. Open it in a browser without a server or network. It does not register a service worker. Some mobile file viewers do not execute HTML apps; use the installable home-screen version there. Game state remains in memory, so closing/refreshing begins a new session. External reference links require a connection. Clearing browser/site data removes the installed app’s cached resources.
+
+For source changes, install development dependencies with `pnpm install`, then run `pnpm build` before publishing. Esbuild is a build-only dependency; the game makes no runtime API calls. The build generates the standalone HTML and a content-versioned `dist/sw.js`. It embeds local JavaScript modules through a virtual resolver, without scanning directories outside the project. The worker caches only its explicit asset list, rejects redirected setup requests, verifies cache completeness, and replaces only older Bridge Room caches. Updates do not reload an active game.
+
+Fonts are bundled locally under their SIL Open Font Licenses in `dist/fonts/`; the same licenses are embedded in the standalone download. Icons are local PNGs with a maskable variant for installation.
+
+## Deal controls
+
+Undo, Play again, and Skip stay below the hand on desktop and mobile. Undo restores the state before your last bid, card or claim and removes any subsequent bot moves; repeated undo also works for cards played from dummy, across trick collection, and after a completed board. Play again uses the same original cards, seats, dealer and vulnerability and restarts the auction. Skip advances the board, dealer and vulnerability cycle. Undo history is cleared when replaying or skipping, so it never crosses boards.
+
+Undoing or replaying a completed board removes only that board’s score and IMP contribution. Finishing it again records its new result once. Skipping an unfinished board adds no result, while skipping a finished board keeps its result. Pending bot actions are cancelled before restoring or replacing the deal.
+
+## Guaranteed claims
+
+During North/South declarer play, **Claim all** appears beside Undo and is enabled on your turn after dummy is exposed. It includes any unfinished trick. A successful claim awards every remaining trick to N/S, calculates the normal duplicate score and bot comparison, and records a separate claim entry without inventing plays for unplayed cards. Undo restores the exact pre-claim position and removes its score/comparison; replay keeps the original deal.
+
+The verifier is separate from probabilistic bot advice. It reads only both N/S hands, the public played cards, remaining hand sizes and observed E/W voids. It searches for a single adaptive declarer strategy that wins against every legal defensive continuation and every consistent E/W allocation. Cards are assigned to hidden hands only as needed; off-suit plays require a feasible allocation with a void in the led suit. Auction guesses, sampled probabilities and actual concealed E/W cards are never used to certify a claim. The search accounts for follow-suit rules, ruffs, entries, overtakes, bad breaks and the current trick. Equivalent adjacent ranks can share a branch, and an uncontested run of solid winners has a direct certificate.
+
+To keep the offline app responsive, verification is bounded by 100,000 search nodes and approximately 750 ms. An unfinished search returns **Claim not verified** and makes no change; it never treats a high probability or timeout as proof. Continue playing and try again later. Claims are currently for N/S declarer control, where both partnership hands are visible.
+
+## Stronger South deals
+
+Open **Preferences** below the desktop table, or **Menu → Preferences** on mobile. **South gets the highest HCP** swaps a maximum-HCP hand into South after a normal shuffle; it does not change the cards or reassign the dealer/vulnerability. South may tie with another hand. The switch defaults off, persists locally when storage is available, and applies to the next new board (including after refresh). Set it once; future deals use it automatically without another prompt. The current board, undo, replay, and its four-bot comparison keep the exact saved hands. Disable the option to return to normal random seating on new boards.
+
+## Duplicate comparison
+
+After each completed board, four bots independently rebid and play the original deal using the same seats, dealer, vulnerability, 2/1 bidding agreements and legal card-play engine. The simulation is isolated from the player's table and does not see the player's auction or decisions. Results stay hidden until the board is complete.
+
+The result panel shows both contracts, declarers, tricks and scores from N/S's perspective. Point difference = your N/S score − bot N/S score; positive favors you. Each board's difference is converted using the standard [ACBL IMP scale](https://www.acbl.org/learn/), then added to the session IMP total. Passed-out tables score zero; abandoning a board adds no comparison. This is one bot-table comparison, not a field matchpoint percentage. The bot auction and all 13 tricks are available for review. Session totals reset on refresh.
+
+## Bidding agreements
+
+The bidding modules implement agreements from [BBO’s GIB System Notes](https://www.bridgebase.com/doc/gib_system_notes.php) (published version 40), with [BBO’s hand-evaluation definitions](https://www.bridgebase.com/doc/gib_descriptions.php). The in-app system card and individual call explanations describe the current agreements. Total points are HCP plus 3/2/1 for a void/singleton/doubleton, less one for each short suit containing an honor. The same engine drives all three opponents, the human’s hint, and the independent four-bot duplicate table.
+
+Coverage includes the basic 2/1 structure, inverted minors, Jacoby 2NT, two-way game tries, Soloway jump shifts and passed-hand fit jumps, reverse Drury, fourth-suit and one-way new-minor forcing, strong and weak two openings, the published 1NT/2NT response structures (including minor transfers, Smolen and Texas), competitive doubles, Cappelletti, Michaels, unusual NT and unusual-versus-unusual, Jordan/Truscott, passed-hand Sandwich NT, Lebensohl, RKCB 0314 with queen and specific-king inquiries, void responses, DOPI, Gerber, and quantitative notrump invitations.
+
+The notes do not define a complete decision algorithm. Where they name conventions without specifying all continuations, this implementation uses standard treatments, including slow-shows Lebensohl ([ACBL reference](https://web2.acbl.org/documentLibrary/play/commonlyusedconventions.pdf)) and standard Cappelletti advances ([ACBL reference](https://web2.acbl.org/documentLibrary/play/Commonly_Used_Conventions/cappellettipt2.pdf)). Rare/unspecified sequences fall back to natural bidding. No Gambling 3NT, Namyats, Bergen, DONT, or Puppet Stayman.
+
+These are independent practice bots with reproducible seeded sampling, not BBO’s proprietary GIB engine. They do not promise identical calls, expert competitive judgment or double-dummy play. `chooseBid` and `chooseCard` receive only their hand and public auction/play information. No external API, service key, backend or paid model is required.
+
+## Card play and turn cues
+
+The active seat has a gold outline and explicit To play / To bid label. The active visible hand also has a gold edge, including the full-width mobile dummy, either vertical opponent dummy, and North's hand after rotation. The auction highlights the next caller. A live status line names the seat; no player is highlighted while a completed trick is being collected or after the board ends.
+
+Bots and card hints use 32 Monte Carlo samples per decision, selected from 128 candidate hidden deals. Only the acting hand, exposed dummy, public auction and played cards enter the view. When dummy acts, declarer also knows their own hand. Observed voids and remaining hand sizes are hard constraints. Suit allocations are drawn using multinomial completion counts, giving a uniform prior over feasible assignments; public HCP, total-point and suit-length bidding meanings then provide soft likelihood weights. Artificial calls use their described target lengths, not the denomination of the call. Bidding remains the existing GIB-style system.
+
+Every legal card is evaluated on the same sampled deals. Full-hand rollouts use a lightweight continuation policy; the final two tricks use exact partnership minimax within each hypothetical deal. The selected card maximizes average duplicate score for the acting partnership, including contract bonuses, vulnerability and penalties. Ties prefer expected tricks and then a lower card. Hints show the leading options, estimated make/defeat percentages and expected points. Percentages describe the sampled model, not calibrated guarantees or a double-dummy solution to the actual deal. Monte Carlo bridge play has known imperfect-information limitations; see [Ginsberg's bridge search paper](https://arxiv.org/abs/1106.0669) for background. No actual hidden cards are supplied to the search, and everything works offline.
+
+## Validation
+
+Run `node --test tests/*.test.mjs`. Covers auction legality, doubles and redoubles, declarer selection, following suit, trump rules, vulnerability, scoring cases, 2/1 applicability, forcing 1NT rebids, Stayman/transfers, GIB convention sequences and continuations, and 500 deterministic complete games. Duplicate-comparison tests also replay 64 boards and verify identical bot decisions and isolated state. Card-play tests check exact card counts and observed voids, auction-weighted samples, hidden-hand independence, declarer/dummy knowledge, finesse and third-hand endings, and turn transitions. Claim tests cover ruffs, finesses, bad breaks, blocked suits, void inference, partial tricks, bounded-search refusal, score/undo behavior and an independent exhaustive oracle for small endings. Offline tests verify bundled assets, install metadata and service-worker cache behavior without a network. Session tests cover undo across bidding/play and completed tricks, repeated score accounting, replay identity, passed-out boards and skip boundaries.
+
+## Source layout
+
+- `dist/bridge-cards.js`: shared card, auction and contract rules
+- `dist/engine.js`: deals, play progression and bot entry points
+- `dist/play-rules.js`: legal cards, trick winners and duplicate scoring
+- `dist/card-play.js`: public-information sampling, rollouts and score-based card advice
+- `dist/turn-state.js`: active-seat detection
+- `dist/claim.js`: distribution-independent claim verification and scoring
+- `dist/gib-system.js`: GIB-style bidding dispatcher
+- `dist/gib-{suit,notrump,competitive,slam}.js`: convention meanings and decisions
+- `dist/bidding-context.js`: public auction context and hand evaluation
+- `dist/natural-bidding.js`: natural continuations for unspecified sequences
+- `dist/gib-system-card.js`: in-app system reference
+- `dist/offline.js`: install/download UI and offline readiness
+- `scripts/build-offline.mjs`: standalone HTML and versioned service-worker build
+- `scripts/sw-template.js`: cache lifecycle and offline asset delivery
+- `dist/manifest.webmanifest`: install metadata and app icons
+- `dist/session.js`: undo snapshots, replay, skip, and score accounting
+- `dist/duplicate.js`: isolated four-bot replay and IMP comparison
+- `dist/app.js`: interface, turn progression and optional WebMCP tools
+- `dist/style.css`: responsive table
+- `dist/index.html`: app shell
+- `.openai/hosting.json`: private Sites deployment identity
+
+The WebMCP adapter exposes public state, a legal South call, and a card from the currently controlled hand, using the same validation and actions as the interface. Concealed hands are not returned.
