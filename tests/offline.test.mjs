@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,access} from 'node:fs/promises';
 import vm from 'node:vm';
+import {offlineCacheReady,prepareOfflineCache} from '../dist/offline.js';
 const dist=new URL('../dist/',import.meta.url);
 const read=name=>readFile(new URL(name,dist),'utf8');
 async function worker({failInstall=false}={}){
  const listeners={},stores=new Map(),requested=[];let offline=false,claimed=false;
  const storesAPI={
   async open(name){if(!stores.has(name))stores.set(name,new Map());const store=stores.get(name);return {
-   async addAll(requests){for(const request of requests){requested.push(request);if(failInstall)throw Error('connection lost');const url=new URL(request.url);const filename=url.pathname==='/'?'index.html':url.pathname.slice(1);const bytes=await readFile(new URL(filename,dist));store.set(request.url,new Response(bytes));}},
+   async addAll(requests){for(const request of requests){requested.push(request);if(failInstall)throw Error('connection lost');const url=new URL(request.url);if(['/index.html','/bridge-room-offline.html'].includes(url.pathname))throw Error('Sites returns a 307 redirect for this HTML filename');const filename=url.pathname==='/'?'index.html':url.pathname==='/bridge-room-offline'?'bridge-room-offline.html':url.pathname.slice(1);const bytes=await readFile(new URL(filename,dist));store.set(request.url,new Response(bytes));}},
    async match(key){return store.get(typeof key==='string'?key:key.url)?.clone();}
   };},async keys(){return [...stores.keys()];},async delete(name){return stores.delete(name);}
  };
@@ -36,6 +37,9 @@ test('service worker serves the whole app and download with the network unavaila
  assert((await (await w.fetchPath('/')).text()).includes('The Bridge Room'));
  for(const path of ['/app.js','/bid-preview.js','/completed-deal.js','/opening-leads.js','/defense.js','/deal-library.js','/deal-library-ui.js','/engine.js','/gib-system.js','/session.js','/offline.js','/style.css','/mobile.css','/icons/icon-192.png','/fonts/dm-sans-400.ttf','/bridge-room-offline.html'])assert((await w.fetchPath(path)).ok,path);
  assert((await (await w.fetchPath('/?launch=home')).text()).includes('The Bridge Room'));
+ assert((await (await w.fetchPath('/index.html')).text()).includes('The Bridge Room'));
+ assert((await (await w.fetchPath('/bridge-room-offline')).text()).includes('data-offline-bundle'));
+ assert(w.requested.every(r=>!new URL(r.url).pathname.endsWith('.html')),'precache uses final hosted URLs, never redirecting HTML aliases');
  assert.equal(await w.fetchPath('/unknown'),undefined);assert.equal(await w.fetchPath('/app.js','POST'),undefined);
  assert(w.requested.every(r=>r.redirect==='error'&&r.cache==='reload'));
 });
@@ -44,4 +48,18 @@ test('failed offline setup is not reported ready and cleans only its incomplete 
 });
 test('activation replaces old app caches and preserves other caches',async()=>{
  const w=await worker();w.stores.set('bridge-room-offline-old',new Map());w.stores.set('unrelated-cache',new Map());await w.lifecycle('install');await w.lifecycle('activate');assert(!w.stores.has('bridge-room-offline-old'));assert(w.stores.has('unrelated-cache'));assert.equal(await w.ready(),true);
+});
+const registration=ready=>({active:{postMessage(message,ports){assert.equal(message.type,'OFFLINE_STATUS');ports[0].postMessage({ready});}}});
+test('an installed offline cache stays ready when the update check has no network',async()=>{
+ let updates=0;
+ const serviceWorker={getRegistration:async()=>registration(true),register:async()=>{updates++;throw Error('No network');},get ready(){throw Error('An existing cache must not wait for a fresh registration');}};
+ assert.equal(await prepareOfflineCache(serviceWorker),true);assert.equal(updates,1);
+});
+test('fresh offline setup verifies the active cache and fails closed on missing assets or network',async()=>{
+ let registered=false;
+ const serviceWorker={getRegistration:async()=>undefined,register:async()=>{registered=true;},ready:Promise.resolve(registration(true))};
+ assert.equal(await prepareOfflineCache(serviceWorker),true);assert(registered);
+ serviceWorker.ready=Promise.resolve(registration(false));assert.equal(await prepareOfflineCache(serviceWorker),false);
+ serviceWorker.register=async()=>{throw Error('No network');};await assert.rejects(prepareOfflineCache(serviceWorker),/No network/);
+ assert.equal(await offlineCacheReady({}),false);
 });

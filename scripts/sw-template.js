@@ -22,6 +22,8 @@ self.addEventListener('fetch',event=>{
  const request=event.request,url=new URL(request.url);
  if(request.method!=='GET'||url.origin!==self.location.origin)return;
  url.search='';url.hash='';
+ // Older bookmarks/download links may use the HTML filename instead of its canonical route.
+ url.pathname=url.pathname.replace(/\/index\.html$/,'/').replace(/\.html$/,'');
  if(!URLs.includes(url.href))return;
  event.respondWith((async()=>{
   const cache=await caches.open(CACHE),saved=await cache.match(url.href);

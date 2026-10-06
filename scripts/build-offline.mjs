@@ -36,5 +36,8 @@ const template=await readFile(path.join(root,'scripts/sw-template.js'),'utf8');
 const assets=await files(),hash=createHash('sha256').update(template);
 for(const name of assets){hash.update(name);hash.update(await readFile(path.join(dist,name)));}
 const version=hash.digest('hex').slice(0,16);
-await writeFile(path.join(dist,'sw.js'),template.replace('__CACHE_NAME__',JSON.stringify('bridge-room-offline-'+version)).replace('__ASSETS__',JSON.stringify(['./',...assets])));
-console.log(`Offline HTML: ${Math.round(Buffer.byteLength(html)/1024)} KB; ${assets.length+1} cached resources; version ${version}.`);
+// Sites serves HTML at canonical extensionless URLs and redirects /index.html to /.
+// Cache those final URLs directly; redirect:'error' must still reject sign-in redirects.
+const cachePaths=['./',...assets.filter(name=>name!=='index.html').map(name=>name.replace(/\.html$/,''))];
+await writeFile(path.join(dist,'sw.js'),template.replace('__CACHE_NAME__',JSON.stringify('bridge-room-offline-'+version)).replace('__ASSETS__',JSON.stringify(cachePaths)));
+console.log(`Offline HTML: ${Math.round(Buffer.byteLength(html)/1024)} KB; ${cachePaths.length} cached resources; version ${version}.`);
