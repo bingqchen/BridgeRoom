@@ -133,6 +133,7 @@ body[data-phase="bidding"] #controls{padding-top:18px}
 #dialog-body .bid-meaning-note{font-size:14px;color:#596e57}
 
 /* Finished deals use a compact compass layout, entirely inside the felt. */
+.board-content{display:contents}
 body[data-phase="complete"] .table{height:auto;min-height:0;border-radius:24px}
 body[data-phase="complete"] .table>.seat,body[data-phase="complete"] .table-center,body[data-phase="complete"] .table-inset,body[data-phase="complete"] .hand-zone{display:none}
 #completed-deal[hidden]{display:none}
@@ -151,6 +152,29 @@ body[data-phase="complete"] .table>.seat,body[data-phase="complete"] .table-cent
 .review-card{display:flex;flex-direction:column;justify-content:center;align-items:center;flex:0 0 21px;width:21px;height:30px;border:1px solid #c8d2c4;border-radius:3px;background:#fffef8;color:#17271f;font:14px/14px Arial,sans-serif;box-shadow:0 1px 2px #0002}
 .review-card b{font-size:14px;line-height:14px}.review-card>span{font-size:12px;line-height:12px}.review-card.red{color:#b12c34}
 .revealed-void{font-size:15px;line-height:30px;color:#cfdfc8}
+
+/* A compact board recap keeps the deal and the next action together. */
+body[data-phase="complete"] #completed-deal{padding:10px 12px}
+body[data-phase="complete"] .completed-deal-heading{margin-bottom:6px}
+body[data-phase="complete"] .revealed-hands{gap:6px 12px}
+body[data-phase="complete"] .revealed-hand{padding:5px 6px}
+body[data-phase="complete"] .revealed-hand-heading{margin-bottom:4px}
+.revealed-suit .review-card{height:20px;width:18px;flex-basis:18px}
+.revealed-suit .review-card>span{display:none}
+.revealed-suit .revealed-suit-label,.revealed-suit .revealed-void{line-height:20px}
+.revealed-suit .revealed-cards{min-height:20px}
+body[data-phase="complete"] #controls .comparison-caption{margin:4px 0 6px}
+body[data-phase="complete"] #controls .comparison-table{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:3px 6px;padding:7px 8px}
+body[data-phase="complete"] #controls .comparison-table>strong{font-size:22px}
+body[data-phase="complete"] #controls .comparison-table>b,body[data-phase="complete"] #controls .comparison-table>small{grid-column:1/-1}
+body[data-phase="complete"] #controls .comparison-swing{margin-top:6px;padding:6px 0;gap:8px}
+body[data-phase="complete"] #controls .comparison-swing>div{flex-direction:row;align-items:baseline;gap:6px}
+body[data-phase="complete"] #controls .comparison-swing strong{font-size:20px;white-space:nowrap}
+body[data-phase="complete"] #controls .comparison-session{margin:5px 0 6px}
+body[data-phase="complete"] #controls .claim-note{margin:5px 0;padding:4px 7px;line-height:1.4}
+body[data-phase="complete"] #controls .result-actions{margin-top:6px;align-items:stretch}
+body[data-phase="complete"] #controls .result-actions .small-button{margin:0;min-height:44px;padding:5px;line-height:1.25}
+body[data-phase="complete"] #controls .result-actions #compare-details{margin:0}
 
 /* Deal entry and the local, offline-compatible practice library. */
 dialog.deal-dialog{width:min(880px,calc(100% - 32px));max-width:880px;max-height:calc(100dvh - 40px);overflow:auto}

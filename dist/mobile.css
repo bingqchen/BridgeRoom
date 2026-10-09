@@ -130,7 +130,29 @@
  .revealed-suit{gap:3px}.revealed-cards{gap:2px}
  .completed-results{display:none}
  body[data-phase="complete"] .completed-results{display:block;padding:0 8px 12px;background:var(--mobile-felt)}
- .completed-results .controls{padding:14px;border-radius:7px;background:#f6f8ef;color:#244334}
+ .completed-results .controls{padding:9px 10px;border-radius:7px;background:#f6f8ef;color:#244334}
  .completed-results .controls h3{font-size:17px;margin:0}
  .completed-results .small-button{min-height:44px;font-size:14px}
+}
+
+/* Only review content scrolls after completion; both action rows stay in view. */
+@media(max-width:700px){
+ body[data-phase="complete"]{height:100svh;height:100dvh;overflow:hidden}
+ body[data-phase="complete"] .workspace{flex:1 1 0;min-height:0;overflow:hidden}
+ body[data-phase="complete"] .game-column{height:100%;min-height:0}
+ body[data-phase="complete"] .board-content{display:block;flex:1 1 0;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
+ body[data-phase="complete"] #completed-deal{padding:6px 8px 8px}
+ body[data-phase="complete"] .completed-deal-heading{font-size:12px;margin-bottom:4px}
+ body[data-phase="complete"] .revealed-hands{gap:5px 8px}
+ body[data-phase="complete"] .revealed-hand-heading{gap:2px 5px}
+ body[data-phase="complete"] .completed-results{padding-bottom:8px}
+ body[data-phase="complete"] #controls h3{font-size:14px}
+ body[data-phase="complete"] #controls .comparison-caption,body[data-phase="complete"] #review-deal{display:none}
+ body[data-phase="complete"] #controls .comparison-tables{margin-top:6px;gap:6px}
+ body[data-phase="complete"] #controls .comparison-table>span{font-size:13px}
+ body[data-phase="complete"] #controls .comparison-table>b{font-size:13px}
+ body[data-phase="complete"] #controls .comparison-table>small{font-size:12px}
+ body[data-phase="complete"] #controls .comparison-swing span{font-size:12px}
+ body[data-phase="complete"] #controls .comparison-session{font-size:12px}
+ body[data-phase="complete"] .deal-actions{border-top:1px solid #ffffff25}
 }
