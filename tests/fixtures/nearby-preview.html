@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+ <title>Nearby Bridge · Test Transport</title>
+ <link rel="stylesheet" href="/native/ios/BridgeRoom/Web/nearby.css">
+ <style>.test-transport-label{flex-shrink:0;background:#e4ae45;color:#241a06;text-align:center;font:10px/18px system-ui,sans-serif;letter-spacing:.05em}</style>
+</head>
+<body>
+ <div class="test-transport-label">TEST TRANSPORT · browser tabs only · not iOS networking</div>
+ <header><span class="brand">♠ The Bridge Room</span><span id="connection" role="status">Nearby play</span></header>
+ <main id="app"></main><div id="notice" role="alert" hidden></div>
+ <dialog id="meaning"><div class="dialog-heading"><h2 id="meaning-title">Bid meaning</h2><button id="close-meaning" aria-label="Close explanation">×</button></div><p id="meaning-text"></p></dialog>
+ <script src="nearby-preview.js"></script>
+ <script src="/native/ios/BridgeRoom/Web/nearby.js"></script>
+</body>
+</html>

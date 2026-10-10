@@ -1,3 +1,7 @@
 node_modules/
 .sites-runtime/
 .DS_Store
+native/ios/build/
+native/ios/DerivedData/
+**/xcuserdata/
+*.xcuserstate
