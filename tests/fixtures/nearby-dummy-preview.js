@@ -23,7 +23,7 @@ const table=new NearbyTable({
  }
 });
 if(humanDeclarer){
- table.join(NORTH,'Human partner');
+ table.join(NORTH,'Human partner',0);
  document.querySelector('.test-scenario-label').textContent='TEST SCENARIO · human dummy / human declarer · not iOS networking';
 }
 table.action(SOUTH,{type:'start',revision:table.revision});

@@ -1,29 +1,35 @@
 import {createDeal,makeCall,playCard,collectTrick,botBid,botCard,legalCalls,legalCards} from '../../dist/engine.js';
 import {replayDeal} from '../../dist/session.js';
 
-export const NEARBY_PROTOCOL=2;
+export const NEARBY_PROTOCOL=3;
 const copy=value=>structuredClone(value);
 const cleanName=value=>String(value||'Player').replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,28)||'Player';
 
 // Runs only on the hosting device. Never send this instance or state over the wire.
 export class NearbyTable {
- constructor({hostId,hostName='Host',rng=Math.random,dealFactory=createDeal}={}){
+ constructor({hostId,hostName='Host',hostSeat=2,rng=Math.random,dealFactory=createDeal}={}){
   if(typeof hostId!=='string'||!hostId.length)throw Error('A host identity is required.');
-  this.hostId=hostId;this.rng=rng;this.dealFactory=dealFactory;
-  this.players=[null,null,{id:hostId,name:cleanName(hostName),connected:true},null];
+  if(!Number.isInteger(hostSeat)||hostSeat<0||hostSeat>3)throw Error('Choose a valid host seat.');
+  this.hostId=hostId;this.hostSeat=hostSeat;this.rng=rng;this.dealFactory=dealFactory;
+  this.players=[null,null,null,null];this.players[hostSeat]={id:hostId,name:cleanName(hostName),connected:true};
   this.state=null;this.revision=0;this.active=true;this.totals=[0,0];this.scoredState=null;this.score=0;this.replaced=new Set();
  }
  get started(){return this.state!==null;}
  get paused(){return !this.active||this.players.some(p=>p&&!p.connected);}
  seatFor(id){return this.players.findIndex(p=>p?.id===id);}
  requirePlayer(id){const seat=this.seatFor(id);if(seat<0)throw Error('You do not have a seat at this table.');return seat;}
- join(id,name){
+ join(id,name,seat){
   if(typeof id!=='string'||!id.length||id.length>128)throw Error('Invalid player identity.');
   if(this.replaced.has(id))throw Error('Your seat was replaced by a bot. Join a new table to play again.');
+  if(!Number.isInteger(seat)||seat<0||seat>3)throw Error('A valid assigned seat is required.');
   const existing=this.seatFor(id);
-  if(existing>=0){this.setConnected(id,true);return existing;}
+  if(existing>=0){
+   if(existing!==seat)throw Error('Reconnect using the invitation for your assigned seat.');
+   this.setConnected(id,true);return existing;
+  }
+  if(seat===this.hostSeat)throw Error('That seat belongs to the host.');
   if(this.started)throw Error('This table has started. Only returning players can reconnect.');
-  const seat=this.players.findIndex(p=>!p);if(seat<0)throw Error('This table is full.');
+  if(this.players[seat])throw Error('That seat is occupied.');
   this.players[seat]={id,name:cleanName(name),connected:true};this.revision++;return seat;
  }
  setConnected(id,connected){
@@ -52,13 +58,7 @@ export class NearbyTable {
   const host=id===this.hostId;
   if(['start','next','replay','replace'].includes(action.type)&&!host)throw Error('Only the host can do that.');
   switch(action.type){
-   case 'seat': {
-    if(this.started)throw Error('Seats cannot change during play.');
-    const target=action.seat;if(!Number.isInteger(target)||target<0||target>3)throw Error('Choose a valid seat.');
-    if(this.players[target]&&target!==seat)throw Error('That seat is occupied.');
-    if(target!==seat){this.players[target]=this.players[seat];this.players[seat]=null;}
-    break;
-   }
+   case 'seat':throw Error('Seats are fixed by invitation.');
    case 'start':
     if(this.started)throw Error('The table has already started.');
     if(this.paused)throw Error('Wait for all players to reconnect.');

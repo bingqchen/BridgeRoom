@@ -94,7 +94,7 @@ struct GameWebView: UIViewRepresentable {
                 transport.setActive(UIApplication.shared.applicationState == .active)
             } else if type == "copy", let text = body["text"] as? String, text.utf8.count <= 4096 {
                 UIPasteboard.general.string = text
-                deliver(["type": "status", "message": "Copied. Share this invitation only with its player."])
+                deliver(["type": "status", "message": "Seat PIN copied. Share it with that player."])
             } else if type == "share", let text = body["text"] as? String, text.utf8.count <= 4096,
                       let view = webView, let presenter = presenter(for: view) {
                 let activity = UIActivityViewController(activityItems: [text], applicationActivities: nil)

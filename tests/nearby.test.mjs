@@ -11,7 +11,7 @@ function table(options={}){
  return new NearbyTable({hostId:HOST,hostName:'Host',rng:rng(),...options});
 }
 function fourPlayers(t){
- t.join(IDS[0],'North');t.join(IDS[1],'East');t.join(IDS[3],'West');return t;
+ t.join(IDS[0],'North',0);t.join(IDS[1],'East',1);t.join(IDS[3],'West',3);return t;
 }
 function act(t,id,type,fields={}){
  return t.action(id,{type,revision:t.view(id).revision,...fields});
@@ -44,20 +44,20 @@ function finishMixedBoard(t){
 
 test('nearby lobby reserves one seat per identity and only the host starts the table',()=>{
  const t=table(),initial=t.view(HOST);
- assert.equal(NEARBY_PROTOCOL,2);assert.equal(initial.protocol,NEARBY_PROTOCOL);assert.equal(initial.you,2);assert.equal(initial.host,true);
+ assert.equal(NEARBY_PROTOCOL,3);assert.equal(initial.protocol,NEARBY_PROTOCOL);assert.equal(initial.you,2);assert.equal(initial.host,true);
  assert.equal(initial.started,false);assert.equal(initial.state,null);
  assert.equal(initial.players.filter(p=>p.bot).length,3);
- t.join('guest','Guest');
+ t.join('guest','Guest',0);
  assert.equal(t.view('guest').you,0);assert.equal(t.view('guest').host,false);
- t.join('guest','Guest reconnected');
+ t.join('guest','Guest reconnected',0);
  assert.equal(t.view('guest').you,0);
  assert.equal(t.view(HOST).players.filter(p=>!p.bot).length,2);
  assert.throws(()=>act(t,'guest','start'));
  assert.throws(()=>t.action('stranger',{type:'start'}));
  assert.throws(()=>t.view('stranger'));
  assert.throws(()=>act(t,HOST,'seat',{seat:0}));
- act(t,HOST,'seat',{seat:1});
- assert.equal(t.view(HOST).you,1);assert.equal(t.view(HOST).players[2].bot,true);
+ assert.throws(()=>act(t,HOST,'seat',{seat:1}));
+ assert.equal(t.view(HOST).you,2);assert.equal(t.view(HOST).players[1].bot,true);
  assert.throws(()=>act(t,HOST,'seat',{seat:-1}));
  assert.throws(()=>act(t,HOST,'seat',{seat:4}));
  assert.throws(()=>act(t,HOST,'seat',{seat:1.5}));
@@ -65,12 +65,75 @@ test('nearby lobby reserves one seat per identity and only the host starts the t
  assert.equal(t.view(HOST).started,true);
  assert.throws(()=>act(t,HOST,'seat',{seat:2}));
  assert.throws(()=>act(t,HOST,'start'));
- assert.throws(()=>t.join('late','Late arrival'));
+ assert.throws(()=>t.join('late','Late arrival',3));
+});
+
+test('nearby reserves the chosen host seat and validates assigned guest seats without mutating the lobby',()=>{
+ for(const hostSeat of [0,1,2,3]){
+  const t=table({hostSeat}),initial=t.view(HOST);
+  assert.equal(initial.you,hostSeat);
+  assert.equal(initial.players[hostSeat].bot,false);
+  assert.throws(()=>t.join('guest','Guest',hostSeat),/host/);
+  for(const seat of [undefined,null,-1,4,1.5,'0',NaN,Infinity]){
+   assert.throws(()=>t.join('guest','Guest',seat),/assigned seat/);
+   assert.deepEqual(t.view(HOST),initial);
+  }
+  const guestSeat=(hostSeat+1)%4;
+  assert.equal(t.join('guest','Guest',guestSeat),guestSeat);
+  assert.equal(t.view('guest').you,guestSeat);
+ }
+ for(const hostSeat of [null,-1,4,1.5,'2',NaN,Infinity])assert.throws(()=>table({hostSeat}),/host seat/);
+});
+
+test('nearby rejects a second identity assigned to an occupied seat without choosing another seat',()=>{
+ const t=table();t.join('first','First guest',3);
+ const before=t.view(HOST);
+ assert.throws(()=>t.join('second','Second guest',3),/occupied/);
+ assert.deepEqual(t.view(HOST),before);
+ assert.equal(t.seatFor('second'),-1);
+ t.setConnected('first',false);
+ const disconnected=t.view(HOST);
+ assert.throws(()=>t.join('second','Second guest',3),/occupied/);
+ assert.deepEqual(t.view(HOST),disconnected);
+});
+
+test('nearby reconnects an identity only with its assigned seat before and after starting',()=>{
+ const t=table();t.join('guest','Guest',1);
+ for(const started of [false,true]){
+  if(started)start(t);
+  t.setConnected('guest',false);
+  const before=t.view(HOST);
+  for(const seat of [0,2,3]){
+   assert.throws(()=>t.join('guest','Guest',seat),/assigned seat/);
+   assert.deepEqual(t.view(HOST),before);
+  }
+  assert.equal(t.join('guest','Guest',1),1);
+  assert.equal(t.view('guest').you,1);
+  assert.equal(t.view(HOST).paused,false);
+ }
+});
+
+test('nearby rejects seat actions and ignores forged actor seats in bid actions',()=>{
+ const t=fourPlayers(table());
+ for(const started of [false,true]){
+  if(started)start(t);
+  const before=t.view(HOST);
+  for(const id of [HOST,IDS[0]]){
+   for(const seat of [0,1,2,3])assert.throws(()=>act(t,id,'seat',{seat}),/fixed/);
+  }
+  assert.deepEqual(t.view(HOST),before);
+ }
+ const before=structuredClone(t.state),revision=t.revision;
+ assert.throws(()=>act(t,IDS[1],'bid',{seat:0,bid:'1C'}),/not your turn/);
+ assert.deepEqual(t.state,before);assert.equal(t.revision,revision);
+ act(t,IDS[0],'bid',{seat:1,bid:'1C'});
+ assert.equal(t.state.auction[0].seat,0);
+ assert.equal(t.view(IDS[0]).you,0);assert.equal(t.view(IDS[1]).you,1);
 });
 
 test('nearby snapshots reveal only the player hand before the opening lead, including nested fields',()=>{
  const t=start(fourPlayers(table()));
- assert.throws(()=>t.join('fifth','Fifth player'));
+ assert.throws(()=>t.join('fifth','Fifth player',3));
  for(let seat=0;seat<4;seat++){
   const view=t.view(IDS[seat]);
   assert.equal(view.you,seat);
@@ -108,15 +171,15 @@ test('nearby rejects stale, out-of-turn, illegal, and client-authored state chan
 });
 
 test('nearby stops automated and human play while disconnected or backgrounded, then reconnects to the same seat',()=>{
- const t=table({dealFactory:contractDeal(2)});t.join('guest','Guest');start(t);
+ const t=table({dealFactory:contractDeal(2)});t.join('guest','Guest',0);start(t);
  t.setConnected('guest',false);
  assert.equal(t.view(HOST).paused,true);
  const before=structuredClone(t.state),revision=t.view(HOST).revision;
  t.step();assert.deepEqual(t.state,before);assert.equal(t.view(HOST).revision,revision);
  assert.throws(()=>act(t,HOST,'play',{cardId:t.state.hands[2][0].id}));
- t.join('guest','Guest');
+ t.join('guest','Guest',0);
  assert.equal(t.view('guest').you,0);assert.equal(t.view(HOST).paused,false);
- assert.throws(()=>t.join('intruder','Guest'));
+ assert.throws(()=>t.join('intruder','Guest',1));
  t.setActive(false);assert.equal(t.view(HOST).paused,true);
  t.step();assert.deepEqual(t.state,before);
  t.setActive(true);assert.equal(t.view(HOST).paused,false);
@@ -124,21 +187,21 @@ test('nearby stops automated and human play while disconnected or backgrounded, 
 });
 
 test('only the host may replace a disconnected player with a bot, without opening the seat to a newcomer',()=>{
- const t=table({dealFactory:contractDeal(2)});t.join('guest','Guest');t.join('other','Other');start(t);
+ const t=table({dealFactory:contractDeal(2)});t.join('guest','Guest',0);t.join('other','Other',1);start(t);
  assert.throws(()=>act(t,HOST,'replace',{seat:0}));
  t.setConnected('guest',false);
  assert.throws(()=>act(t,'other','replace',{seat:0}));
  assert.throws(()=>act(t,HOST,'replace',{seat:2}));
  act(t,HOST,'replace',{seat:0});
  assert.equal(t.view(HOST).players[0].bot,true);assert.equal(t.view(HOST).paused,false);
- assert.throws(()=>t.join('guest','Guest'));
+ assert.throws(()=>t.join('guest','Guest',0));
  assert.throws(()=>t.view('guest'));
 });
 
 test('replacing a disconnected lobby guest also prevents their automatic reconnection',()=>{
- const t=table();t.join('guest','Guest');t.setConnected('guest',false);
+ const t=table();t.join('guest','Guest',0);t.setConnected('guest',false);
  act(t,HOST,'replace',{seat:0});
- assert.throws(()=>t.join('guest','Guest'));
+ for(const seat of [0,1,2,3])assert.throws(()=>t.join('guest','Guest',seat),/replaced/);
  assert.equal(t.view(HOST).players[0].bot,true);
 });
 
@@ -176,9 +239,8 @@ test('each human dummy sees declarer only after the lead, while the human declar
 test('human dummy controls both bot-declarer partnership hands after the lead in every seat, with a rotated view',()=>{
  for(let declarer=0;declarer<4;declarer++){
   const dummy=(declarer+2)%4,lead=(declarer+1)%4,otherDefender=(declarer+3)%4;
-  const t=table({dealFactory:contractDeal(declarer)});
-  act(t,HOST,'seat',{seat:dummy});
-  t.join('defender','Defender');act(t,'defender','seat',{seat:lead});
+  const t=table({hostSeat:dummy,dealFactory:contractDeal(declarer)});
+  t.join('defender','Defender',lead);
   assert.equal(bottomSeatFor(t.view(HOST)),dummy);
   start(t);
   const beforeLead=t.view(HOST);
@@ -217,8 +279,8 @@ test('nearby perspective keeps bidding seats unchanged and does not rotate a def
   const view=t.view(IDS[you]);assert.equal(bottomSeatFor(view),you);
   assert.equal(tablePosition(view,you),2);assert.equal(tablePosition(view,(you+2)%4),0);
  }
- const defending=table({dealFactory:contractDeal(0)});
- act(defending,HOST,'seat',{seat:1});start(defending);playLegal(defending,HOST);
+ const defending=table({hostSeat:1,dealFactory:contractDeal(0)});
+ start(defending);playLegal(defending,HOST);
  assert.equal(bottomSeatFor(defending.view(HOST)),1);
  assert.equal(tablePosition(defending.view(HOST),3),0);
  assert.equal(defending.view(HOST).state.hands[0],null);
@@ -226,7 +288,7 @@ test('nearby perspective keeps bidding seats unchanged and does not rotate a def
 
 test('a disconnected human dummy pauses both hands until replaced, then both partnership hands resume as bots',()=>{
  const t=table({dealFactory:contractDeal(1)});
- t.join('dummy','Dummy');act(t,'dummy','seat',{seat:3});start(t);
+ t.join('dummy','Dummy',3);start(t);
  playLegal(t,HOST);assert.equal(t.state.turn,3);assert.equal(t.view('dummy').controller,3);
  t.setConnected('dummy',false);
  assert.equal(t.view(HOST).paused,true);assert.deepEqual(t.view('dummy').legalCards,[]);
@@ -240,11 +302,11 @@ test('a disconnected human dummy pauses both hands until replaced, then both par
  assert.equal(t.step(),true);assert.equal(t.state.trick[1].seat,3);
  assert.equal(t.step(),true);assert.equal(t.state.trick[2].seat,0);
  assert.equal(t.step(),true);assert.equal(t.state.trick[3].seat,1);
- assert.throws(()=>t.join('dummy','Dummy'));
+ assert.throws(()=>t.join('dummy','Dummy',3));
 });
 
 test('replacing a disconnected human declarer transfers both hands to human dummy only after replacement',()=>{
- const t=table({dealFactory:contractDeal(0)});t.join('declarer','Declarer');start(t);
+ const t=table({dealFactory:contractDeal(0)});t.join('declarer','Declarer',0);start(t);
  t.step();assert.equal(t.state.turn,2);
  assert.equal(t.view(HOST).controller,0);assert.deepEqual(t.view(HOST).legalCards,[]);
  assert.deepEqual(t.view(HOST).state.hands[0],t.state.hands[0]);
@@ -264,7 +326,7 @@ test('replacing a disconnected human declarer transfers both hands to human dumm
  assert.equal(t.step(),true);assert.equal(t.state.trick[2].seat,3);
  assert.equal(t.state.turn,0);assert.equal(t.view(HOST).controller,2);
  assert.equal(t.step(),false);playLegal(t,HOST);assert.equal(t.state.trick[3].seat,0);
- assert.throws(()=>t.join('declarer','Declarer'));
+ assert.throws(()=>t.join('declarer','Declarer',0));
 });
 
 test('human dummy can finish a full bot-declarer board, and replay restores concealed hands and the original perspective',()=>{

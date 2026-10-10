@@ -1,6 +1,7 @@
 // Browser-only UI fixture. This file is never bundled into the native app.
 // Open this page twice on one origin with ?role=host and ?role=guest.
-// Use 11111111111111111111111111111111 for the first guest, then 222… or 333….
+// Seat PINs are North 1111, East 2222, South 3333, and West 4444.
+// The chosen host seat has no guest invitation; South is the default host seat.
 // role identifies a test device; optional session isolates simultaneous tests.
 // BroadcastChannel deliberately substitutes for, and does not test, native TLS.
 (()=>{
@@ -11,9 +12,9 @@
  if(!device){device=crypto.randomUUID();sessionStorage.setItem(storageKey,device);}
  const endpoint=crypto.randomUUID(),identity=`fixture-${role}-${device}`;
  const channel=new BroadcastChannel(`bridge-nearby-fixture:${session}`);
- const invitations=['1'.repeat(32),'2'.repeat(32),'3'.repeat(32)];
+ const seatPins=['1111','2222','3333','4444'];
  const queue=[],discovered=new Map(),peers=new Map(),owners=new Map();
- let ready=false,mode='idle',host=null,hostingId=null,hostingName='',lastJoin=null;
+ let ready=false,mode='idle',host=null,hostingId=null,hostingName='',hostSeat=2,lastJoin=null;
  const send=(type,fields={},to=null)=>channel.postMessage({type,...fields,from:endpoint,to});
  function emit(event){
   if(ready&&typeof window.bridgeNativeEvent==='function')window.bridgeNativeEvent(event);
@@ -42,19 +43,25 @@
   switch(message.type){
    case 'ready':
     ready=true;while(queue.length)window.bridgeNativeEvent(queue.shift());break;
-   case 'host':
+   case 'host': {
+    const seat=message.seat??2;
+    if(!Number.isInteger(seat)||seat<0||seat>3)return error('Choose a valid host seat.');
     leave(false);mode='host';hostingId=`fixture-table-${identity}`;hostingName=String(message.name||'Host').slice(0,28);
-    emit({type:'hosting',id:identity,name:hostingName,invites:[...invitations]});announce();break;
+    hostSeat=seat;
+    const invites=seatPins.map((pin,seat)=>({seat,pin})).filter(invite=>invite.seat!==hostSeat);
+    emit({type:'hosting',id:identity,name:hostingName,seat:hostSeat,invites});announce();break;
+   }
    case 'browse':
     leave(false);mode='browse';emit({type:'tables',tables:[]});
     emit({type:'status',message:'Test transport: looking for another browser tab.'});send('discover');break;
    case 'join': {
     const target=discovered.get(message.tableId);
     if(!target)return error('Test host not found. Open the host fixture in another tab.');
-    const code=String(message.code||'').replace(/[\s-]/g,'').toLowerCase();
-    if(!invitations.includes(code))return error('Use the private invitation shown in the host tab.');
+    const seat=message.seat,code=String(message.code||'').trim();
+    if(!Number.isInteger(seat)||seat<0||seat>3||!/^\d{4}$/.test(code)||seatPins[seat]!==code)
+     return error('Use the four-digit PIN for your assigned seat shown in the host tab.');
     mode='guest';host={endpoint:target.endpoint,tableId:target.id};
-    lastJoin={tableId:target.id,code,name:String(message.name||'Player').slice(0,28),identity};
+    lastJoin={tableId:target.id,seat,code,name:String(message.name||'Player').slice(0,28),identity};
     send('join',lastJoin,host.endpoint);break;
    }
    case 'send':
@@ -78,17 +85,20 @@
     break;
    case 'join': {
     if(mode!=='host'||data.tableId!==hostingId)return;
-    if(!invitations.includes(data.code))return send('rejected',{message:'Incorrect test invitation.'},data.from);
-    // Once claimed, a code belongs to a test device. Actions cannot choose the
-    // peerId delivered to the app: it always comes from this authenticated map.
-    const owner=owners.get(data.code);
+    if(!Number.isInteger(data.seat)||data.seat<0||data.seat>3||data.seat===hostSeat||seatPins[data.seat]!==data.code)
+     return send('rejected',{message:'Incorrect test seat PIN.'},data.from);
+    // A seat belongs to one test device, including after disconnects. Actions
+    // cannot choose the peerId or assigned seat delivered to the app.
+    const owner=owners.get(data.seat);
     if(owner&&owner!==data.identity)return send('rejected',{message:'That invitation belongs to another player.'},data.from);
     if(typeof data.identity!=='string'||!data.identity.startsWith('fixture-'))return;
-    owners.set(data.code,data.identity);
+    for(const [seat,identity] of owners)if(identity===data.identity&&seat!==data.seat)
+     return send('rejected',{message:'Reconnect using the PIN for your assigned seat.'},data.from);
+    owners.set(data.seat,data.identity);
     for(const [key,peer] of peers)if(peer.identity===data.identity)peers.delete(key);
-    peers.set(data.from,{endpoint:data.from,identity:data.identity,name:data.name});
+    peers.set(data.from,{endpoint:data.from,identity:data.identity,name:data.name,seat:data.seat});
     send('joined',{identity:data.identity,tableId:hostingId},data.from);
-    emit({type:'peer',id:data.identity,name:data.name,connected:true});break;
+    emit({type:'peer',id:data.identity,name:data.name,seat:data.seat,connected:true});break;
    }
    case 'joined':
     if(mode==='guest'&&data.from===host?.endpoint&&data.tableId===host.tableId&&data.identity===identity)
