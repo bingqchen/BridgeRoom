@@ -77,9 +77,10 @@ test('tactics cannot trade away the modeled setting chance and never override ex
 });
 test('notrump hold-up advice yields to an immediately available setting trick',()=>{
  const v=view('A53','KQJT',[c(2,8)],3,'N');v.contract.level=3;
- assert([...defensePlan(v).preferences.values()].some(p=>p.method==='hold-up'));
+ const worlds=[[ranks('KQJT'),ranks('976'),ranks('2'),v.hand]];
+ assert([...defensePlan(v,worlds).preferences.values()].some(p=>p.method==='hold-up'));
  v.history=Array.from({length:4},()=>({winner:1,cards:[]}));
- assert(![...defensePlan(v).preferences.values()].some(p=>p.method==='hold-up'));
+ assert.equal(defensePlan(v,worlds).preferences.get('C14').method,'take-setting-trick');
 });
 test('slam leads are passive in NT, attack useful side suits at six of a suit, and cash an ace against 7NT',()=>{
  const base={seat:3,contract:{...contract,level:6,suit:'N'},hand:hand({S:'KJ862',H:'973',D:'Q84',C:'65'}),trick:[],history:[],auction:[]};

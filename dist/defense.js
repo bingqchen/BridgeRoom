@@ -1,5 +1,6 @@
 import {SUITS,side,partner} from './bridge-cards.js';
 import {legalCards,trickWinner} from './play-rules.js';
+import {defensiveTiming} from './defense-timing.js';
 const suits=SUITS.slice(0,4),descending=h=>[...h].sort((a,b)=>b.rank-a.rank);
 const inSuit=(h,s)=>descending(h.filter(c=>c.suit===s));
 const value=(c,lead,trump)=>(c.suit===trump?100:c.suit===lead?50:0)+c.rank;
@@ -90,13 +91,26 @@ function discardGuard(hand,card,dummy){
 }
 
 // These are preferences, not forced plays. The score search may override them.
-export function defensePlan(view){
+export function defensePlan(view,worlds=[]){
  const {hand,seat,contract}=view,trick=view.trick||[],history=view.history||[];
  if(!contract||!isDefender(seat,contract))return null;
  const cards=legalCards(hand,trick),preferences=new Map(),dummy=view.knownHands?.[contract.dummy]||view.dummyHand||[];
  const currentIds=new Set(trick.map(x=>x.card.id));
  const played=publicTricks(view).flat().filter(x=>!currentIds.has(x.card.id)).map(x=>x.card),observations=signalObservations(view);
  const prefer=(card,priority,method,reason)=>{if(card&&cards.some(c=>c.id===card.id)&&(!preferences.has(card.id)||preferences.get(card.id).priority<priority))preferences.set(card.id,{priority,method,reason});};
+ // Use the same weighted public-information samples as the score search.
+ // A timing preference requires agreement in a majority of those samples.
+ const encode=c=>SUITS.indexOf(c.suit)*13+c.rank-2,timings=new Map();
+ const defenseTaken=history.filter(t=>isDefender(t.winner,contract)).length;
+ for(const world of worlds){
+  const t=defensiveTiming(world.map(h=>h.map(encode)),trick.map(x=>({seat:x.seat,card:encode(x.card)})),seat,{...contract,trump:SUITS.indexOf(contract.suit)},defenseTaken,history.length-defenseTaken);
+  if(!t)continue;
+  const key=t.card+':'+t.method,entry=timings.get(key)||{...t,count:0};entry.count++;timings.set(key,entry);
+ }
+ for(const t of timings.values())if(t.count/worlds.length>=.6){
+  const card=cards.find(c=>encode(c)===t.card);
+  prefer(card,t.priority,t.method,t.reason+` Supported by ${Math.round(100*t.count/worlds.length)}% of sampled deals.`);
+ }
  if(!trick.length)return {system,preferences,observedSignals:observations.length};
  const lead=trick[0],s=lead.card.suit,holding=inSuit(hand,s),win=trick.find(x=>x.seat===trickWinner(trick,contract.suit));
  const beats=c=>value(c,s,contract.suit)>value(win.card,s,contract.suit);
@@ -134,10 +148,6 @@ export function defensePlan(view){
   if(trick.length===3){
    if(win.seat===partner(seat))prefer(signal?.card||low,24,'preserve-partner','Partner has won this trick; preserve your higher cards.');
    else{const winning=holding.filter(beats).at(-1);prefer(winning,25,'cheapest-winner','Win with the smallest card that beats the current winner.');}
-  }
-  if(contract.suit==='N'&&top?.rank===14&&holding.length>1&&!isDefender(lead.seat,contract)&&d.length>=3&&d.some(c=>c.rank>=11)){
-   const defenseTricks=history.filter(t=>isDefender(t.winner,contract)).length;
-   if(defenseTricks+1<8-contract.level)prefer(low,18,'hold-up','Consider holding the ace to interrupt access to dummy’s long suit; the simulations compare taking it now.');
   }
  }
  return {system,preferences,observedSignals:observations.length};
