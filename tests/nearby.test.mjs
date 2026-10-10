@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {NearbyTable} from '../native/shared/nearby-table.js';
+import {NearbyTable,NEARBY_PROTOCOL} from '../native/shared/nearby-table.js';
+import {bottomSeatFor,tablePosition} from '../native/shared/nearby-view.js';
 import * as E from '../dist/engine.js';
 
 const HOST='host';
@@ -43,7 +44,7 @@ function finishMixedBoard(t){
 
 test('nearby lobby reserves one seat per identity and only the host starts the table',()=>{
  const t=table(),initial=t.view(HOST);
- assert.equal(initial.protocol,1);assert.equal(initial.you,2);assert.equal(initial.host,true);
+ assert.equal(NEARBY_PROTOCOL,2);assert.equal(initial.protocol,NEARBY_PROTOCOL);assert.equal(initial.you,2);assert.equal(initial.host,true);
  assert.equal(initial.started,false);assert.equal(initial.state,null);
  assert.equal(initial.players.filter(p=>p.bot).length,3);
  t.join('guest','Guest');
@@ -141,33 +142,147 @@ test('replacing a disconnected lobby guest also prevents their automatic reconne
  assert.equal(t.view(HOST).players[0].bot,true);
 });
 
-test('each human declarer controls dummy, while human dummy cannot see declarer or play either hand',()=>{
+test('each human dummy sees declarer only after the lead, while the human declarer alone plays both hands',()=>{
  for(let declarer=0;declarer<4;declarer++){
   const t=start(fourPlayers(table({dealFactory:contractDeal(declarer)})));
   const lead=(declarer+1)%4,dummy=(declarer+2)%4;
   assert.equal(t.view(IDS[lead]).controller,lead);
   assert.equal(t.view(IDS[declarer]).state.hands[dummy],null);
+  assert.equal(t.view(IDS[dummy]).state.hands[declarer],null);
+  noCardsLeaked(t.view(IDS[dummy]),t.state.hands[declarer]);
   playLegal(t,IDS[lead]);
   assert.equal(t.state.turn,dummy);
   for(const id of IDS)assert.deepEqual(t.view(id).state.hands[dummy],t.state.hands[dummy]);
   const declarerView=t.view(IDS[declarer]),dummyView=t.view(IDS[dummy]);
   assert.equal(declarerView.controller,declarer);
   assert.deepEqual(legalIds(declarerView),E.legalCards(t.state.hands[dummy],t.state.trick).map(c=>c.id));
-  assert.deepEqual(dummyView.legalCards,[]);assert.equal(dummyView.state.hands[declarer],null);
-  noCardsLeaked(dummyView,t.state.hands[declarer]);
+  assert.deepEqual(dummyView.legalCards,[]);assert.deepEqual(dummyView.state.hands[declarer],t.state.hands[declarer]);
+  assert.equal(bottomSeatFor(dummyView),dummy,'A human partner keeps their own seat at the bottom.');
+  assert.equal(tablePosition(dummyView,declarer),0);
+  for(const defender of [lead,(declarer+3)%4]){
+   assert.equal(t.view(IDS[defender]).state.hands[declarer],null);
+   noCardsLeaked(t.view(IDS[defender]),t.state.hands[declarer]);
+  }
   assert.throws(()=>act(t,IDS[dummy],'play',{cardId:legalIds(declarerView)[0]}));
   playLegal(t,IDS[declarer]);assert.equal(t.state.trick.length,2);
+  playLegal(t,IDS[(declarer+3)%4]);
+  assert.equal(t.view(IDS[dummy]).controller,declarer);
+  assert.deepEqual(t.view(IDS[dummy]).legalCards,[]);
+  assert.throws(()=>act(t,IDS[dummy],'play',{cardId:legalIds(t.view(IDS[declarer]))[0]}));
+  playLegal(t,IDS[declarer]);assert.equal(t.state.trick[3].seat,declarer);
  }
 });
 
-test('a bot declarer plays its human partner’s dummy and exposes no declarer cards to that partner',()=>{
- const t=start(table({dealFactory:contractDeal(0)}));
+test('human dummy controls both bot-declarer partnership hands after the lead in every seat, with a rotated view',()=>{
+ for(let declarer=0;declarer<4;declarer++){
+  const dummy=(declarer+2)%4,lead=(declarer+1)%4,otherDefender=(declarer+3)%4;
+  const t=table({dealFactory:contractDeal(declarer)});
+  act(t,HOST,'seat',{seat:dummy});
+  t.join('defender','Defender');act(t,'defender','seat',{seat:lead});
+  assert.equal(bottomSeatFor(t.view(HOST)),dummy);
+  start(t);
+  const beforeLead=t.view(HOST);
+  assert.equal(beforeLead.state.hands[declarer],null);assert.deepEqual(beforeLead.legalCards,[]);
+  noCardsLeaked(beforeLead,t.state.hands[declarer]);
+  assert.equal(bottomSeatFor(beforeLead),dummy);
+  assert.equal(tablePosition(beforeLead,dummy),2);
+  playLegal(t,'defender');
+  const view=t.view(HOST);
+  assert.deepEqual(view.state.hands[declarer],t.state.hands[declarer]);
+  assert.equal(view.controller,dummy);
+  assert.deepEqual(legalIds(view),E.legalCards(t.state.hands[dummy],t.state.trick).map(c=>c.id));
+  assert.equal(t.view('defender').state.hands[declarer],null);
+  noCardsLeaked(t.view('defender'),t.state.hands[declarer]);
+  assert.equal(bottomSeatFor(view),declarer);
+  assert.equal(tablePosition(view,declarer),2);assert.equal(tablePosition(view,dummy),0);
+  assert.equal(tablePosition(view,lead),3);assert.equal(tablePosition(view,otherDefender),1);
+  let before=structuredClone(t.state),revision=view.revision;
+  assert.equal(t.step(),false);assert.deepEqual(t.state,before);assert.equal(t.view(HOST).revision,revision);
+  assert.throws(()=>act(t,'defender','play',{cardId:legalIds(view)[0]}));
+  playLegal(t,HOST);assert.equal(t.state.trick[1].seat,dummy);
+  assert.equal(t.step(),true);assert.equal(t.state.trick[2].seat,otherDefender);
+  assert.equal(t.state.turn,declarer);assert.equal(t.view(HOST).controller,dummy);
+  assert.deepEqual(legalIds(t.view(HOST)),E.legalCards(t.state.hands[declarer],t.state.trick).map(c=>c.id));
+  before=structuredClone(t.state);revision=t.view(HOST).revision;
+  assert.equal(t.step(),false);assert.deepEqual(t.state,before);assert.equal(t.view(HOST).revision,revision);
+  playLegal(t,HOST);assert.equal(t.state.trick[3].seat,declarer);
+  assert.equal(t.view('defender').state.hands[declarer],null);
+  noCardsLeaked(t.view('defender'),t.state.hands[declarer]);
+ }
+});
+
+test('nearby perspective keeps bidding seats unchanged and does not rotate a defender',()=>{
+ const t=start(fourPlayers(table()));
+ for(let you=0;you<4;you++){
+  const view=t.view(IDS[you]);assert.equal(bottomSeatFor(view),you);
+  assert.equal(tablePosition(view,you),2);assert.equal(tablePosition(view,(you+2)%4),0);
+ }
+ const defending=table({dealFactory:contractDeal(0)});
+ act(defending,HOST,'seat',{seat:1});start(defending);playLegal(defending,HOST);
+ assert.equal(bottomSeatFor(defending.view(HOST)),1);
+ assert.equal(tablePosition(defending.view(HOST),3),0);
+ assert.equal(defending.view(HOST).state.hands[0],null);
+});
+
+test('a disconnected human dummy pauses both hands until replaced, then both partnership hands resume as bots',()=>{
+ const t=table({dealFactory:contractDeal(1)});
+ t.join('dummy','Dummy');act(t,'dummy','seat',{seat:3});start(t);
+ playLegal(t,HOST);assert.equal(t.state.turn,3);assert.equal(t.view('dummy').controller,3);
+ t.setConnected('dummy',false);
+ assert.equal(t.view(HOST).paused,true);assert.deepEqual(t.view('dummy').legalCards,[]);
+ const before=structuredClone(t.state);
+ assert.equal(t.step(),false);assert.deepEqual(t.state,before);
+ t.setConnected('dummy',true);
+ assert.equal(t.view('dummy').controller,3);assert(t.view('dummy').legalCards.length>0);
+ assert.equal(t.step(),false);
+ t.setConnected('dummy',false);act(t,HOST,'replace',{seat:3});
+ assert.equal(t.view(HOST).paused,false);assert.equal(t.view(HOST).controller,1);
+ assert.equal(t.step(),true);assert.equal(t.state.trick[1].seat,3);
+ assert.equal(t.step(),true);assert.equal(t.state.trick[2].seat,0);
+ assert.equal(t.step(),true);assert.equal(t.state.trick[3].seat,1);
+ assert.throws(()=>t.join('dummy','Dummy'));
+});
+
+test('replacing a disconnected human declarer transfers both hands to human dummy only after replacement',()=>{
+ const t=table({dealFactory:contractDeal(0)});t.join('declarer','Declarer');start(t);
  t.step();assert.equal(t.state.turn,2);
- const view=t.view(HOST);
- assert.deepEqual(view.legalCards,[]);assert.equal(view.state.hands[0],null);
- noCardsLeaked(view,t.state.hands[0]);
- assert.throws(()=>act(t,HOST,'play',{cardId:t.state.hands[2][0].id}));
- t.step();assert.equal(t.state.trick.length,2);
+ assert.equal(t.view(HOST).controller,0);assert.deepEqual(t.view(HOST).legalCards,[]);
+ assert.deepEqual(t.view(HOST).state.hands[0],t.state.hands[0]);
+ assert(t.view('declarer').legalCards.length>0);
+ t.setConnected('declarer',false);
+ const before=structuredClone(t.state),paused=t.view(HOST);
+ assert.equal(paused.paused,true);assert.equal(paused.controller,0);
+ assert.deepEqual(paused.legalCards,[]);
+ assert.equal(t.step(),false);assert.deepEqual(t.state,before);
+ assert.throws(()=>act(t,HOST,'play',{cardId:E.legalCards(t.state.hands[2],t.state.trick)[0].id}));
+ act(t,HOST,'replace',{seat:0});
+ const transferred=t.view(HOST);
+ assert.equal(transferred.paused,false);assert.equal(transferred.players[0].bot,true);
+ assert.equal(transferred.controller,2);assert.equal(bottomSeatFor(transferred),0);
+ assert.deepEqual(legalIds(transferred),E.legalCards(t.state.hands[2],t.state.trick).map(card=>card.id));
+ assert.equal(t.step(),false);playLegal(t,HOST);assert.equal(t.state.trick[1].seat,2);
+ assert.equal(t.step(),true);assert.equal(t.state.trick[2].seat,3);
+ assert.equal(t.state.turn,0);assert.equal(t.view(HOST).controller,2);
+ assert.equal(t.step(),false);playLegal(t,HOST);assert.equal(t.state.trick[3].seat,0);
+ assert.throws(()=>t.join('declarer','Declarer'));
+});
+
+test('human dummy can finish a full bot-declarer board, and replay restores concealed hands and the original perspective',()=>{
+ const t=start(table({dealFactory:contractDeal(0)})),original=structuredClone(t.state.originalHands);
+ finishMixedBoard(t);
+ assert.equal(t.state.history.length,13);assert.equal(t.state.hands.flat().length,0);
+ assert.equal(new Set(t.state.history.flatMap(trick=>trick.cards.map(play=>play.card.id))).size,52);
+ assert.deepEqual(t.view(HOST).state.originalHands,original);
+ assert.equal(bottomSeatFor(t.view(HOST)),2);
+ const score=t.state.result.nsScore;assert.deepEqual(t.totals,[score,-score]);
+ act(t,HOST,'replay');
+ const replay=t.view(HOST);
+ assert.deepEqual(t.state.hands,original);assert.equal(replay.state.dummyExposed,false);
+ assert.equal(replay.state.hands[0],null);assert.equal(replay.state.originalHands,undefined);
+ noCardsLeaked(replay,t.state.hands[0]);assert.equal(bottomSeatFor(replay),2);
+ assert.deepEqual(t.totals,[0,0]);assert.deepEqual(replay.legalCards,[]);
+ t.step();assert.equal(bottomSeatFor(t.view(HOST)),0);assert.equal(t.view(HOST).controller,2);
+ assert.deepEqual(t.view(HOST).state.hands[0],t.state.hands[0]);
 });
 
 test('nearby enforces follow suit and refuses to play cards from an unauthorized hand',()=>{

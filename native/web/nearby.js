@@ -1,4 +1,5 @@
-import {NearbyTable} from '../shared/nearby-table.js';
+import {NearbyTable,NEARBY_PROTOCOL} from '../shared/nearby-table.js';
+import {bottomSeatFor,tablePosition} from '../shared/nearby-view.js';
 import {SEATS,SYMBOLS,rankName,bidName,hcp,interpret} from '../../dist/engine.js';
 import {bindBidPreview} from '../../dist/bid-preview.js';
 
@@ -48,15 +49,25 @@ function bidding(){
  if(level!==null&&!['C','D','H','S','N'].some(s=>legal.includes(level+s)))level=null;
  return `<div class="bidding"><div class="bid-actions"><button data-bid="P" ${legal.includes('P')?'':'disabled'}>Pass</button><button data-bid="${dbl}" ${legal.includes(dbl)?'':'disabled'}>${bidName(dbl)}</button><span>Hold a call for its GIB meaning</span></div><div class="bid-choices ${level!==null?'suits':''}">${level===null?[1,2,3,4,5,6,7].map(n=>`<button data-level="${n}" ${['C','D','H','S','N'].some(s=>legal.includes(n+s))?'':'disabled'}>${n}</button>`).join(''):`<button data-back>‹ ${level}</button>${['C','D','H','S','N'].map(s=>`<button data-bid="${level+s}" class="${red(s)}" ${legal.includes(level+s)?'':'disabled'}>${SYMBOLS[s]}</button>`).join('')}`}</div></div>`;
 }
-function role(seat){const s=view.state;return s?.contract?.dummy===seat?'Dummy':s?.contract?.declarer===seat?'Declarer':view.players[seat].bot?'Bot':seat===view.you?'You':'Player';}
+function role(seat){const s=view.state;return s?.contract?.dummy===seat?(seat===view.you?'Your dummy':'Dummy'):s?.contract?.declarer===seat?'Declarer':view.players[seat].bot?'Bot':seat===view.you?'You':'Player';}
 function seatMarkup(seat){
  const s=view.state,active=s.phase==='play'&&s.trick.length<4&&s.turn===seat;
- return `<section class="seat ${active?'active':''}"><strong>${SEATS[seat]} · ${escape(view.players[seat].name)}</strong><small>${role(seat)}${active?' · To play':''}</small>${s.dummyExposed&&s.contract.dummy===seat&&seat!==view.you?cards(s.hands[seat],seat,true):`<span class="concealed">${s.counts[seat]} cards</span>`}</section>`;
+ return `<section class="seat ${active?'active':''}"><strong>${SEATS[seat]} · ${escape(view.players[seat].name)}</strong><small>${role(seat)}${active?' · To play':''}</small>${Array.isArray(s.hands[seat])?cards(s.hands[seat],seat,true):`<span class="concealed">${s.counts[seat]} cards</span>`}</section>`;
 }
 function playing(){
- const s=view.state,n=(view.you+2)%4,w=(view.you+1)%4,e=(view.you+3)%4;
- const pos=seat=>['north','east','south','west'][(seat-view.you+6)%4];
+ const s=view.state,bottom=bottomSeatFor(view),n=(bottom+2)%4,w=(bottom+1)%4,e=(bottom+3)%4;
+ const pos=seat=>['north','east','south','west'][tablePosition(view,seat)];
  return `<div class="play-table"><div class="north-seat">${seatMarkup(n)}</div><div class="west-seat">${seatMarkup(w)}</div><div class="trick">${s.trick.map(x=>`<div class="trick-card ${pos(x.seat)} ${red(x.card.suit)}"><b>${rankName(x.card.rank)}</b><span>${SYMBOLS[x.card.suit]}</span></div>`).join('')}${s.trick.length?'':`<span class="felt-mark">♠</span>`}</div><div class="east-seat">${seatMarkup(e)}</div></div>`;
+}
+function mainHand(){
+ const s=view.state,bottom=bottomSeatFor(view),rotated=bottom!==view.you;
+ const title=rotated?`${SEATS[bottom]} · Declarer · You play`:`${SEATS[bottom]} · Your hand${s.contract?.dummy===view.you?' · Dummy':''}`;
+ let note='Tap a highlighted card on your turn.';
+ if(s.phase==='bidding')note='Choose a level, then a suit or NT.';
+ else if(rotated)note=view.controller===view.you?(s.turn===bottom?'Choose a card from declarer’s hand.':'Choose a card from your dummy above.'):`You play ${SEATS[bottom]}’s hand and your dummy.`;
+ else if(s.contract?.dummy===view.you)note=s.dummyExposed?`Watch declarer’s hand above. ${SEATS[s.contract.declarer]} plays both hands.`:'Declarer’s hand will appear after the opening lead.';
+ else if(view.controller===view.you&&s.turn!==view.you)note='Choose a card from dummy.';
+ return `<section class="your-hand ${s.phase==='play'&&s.trick.length<4&&s.turn===bottom?'active':''}"><div><strong>${title}</strong><small>${hcp(s.hands[bottom])} HCP</small></div>${cards(s.hands[bottom],bottom)}<p>${note}</p></section>`;
 }
 function recap(){
  const s=view.state,score=s.result.nsScore??0;
@@ -81,7 +92,7 @@ function render(){
  const s=view.state;
  const waiting=view.paused||!connected;
  const status=waiting?'Paused · waiting for reconnection':!s?'Waiting for players':s.phase==='complete'?'Board complete':s.trick.length===4?'Trick complete':`${SEATS[s.turn]} ${s.phase==='bidding'?'to bid':'to play'}${view.controller===view.you?' · Your turn':''}`;
- app.innerHTML=`<div class="game"><div class="status ${!waiting&&view.controller===view.you?'your-turn':''}" role="status">${escape(status)}</div>${view.host&&view.players.some(p=>!p.bot&&!p.connected)?`<div class="reconnect">${view.players.filter(p=>!p.bot&&!p.connected).map(p=>`<p>${escape(p.name)} disconnected. <button data-replace="${p.seat}">Replace with bot</button></p>`).join('')}</div>`:''}<div class="game-scroll">${!s?lobby():`<div class="board-meta"><span>Board <b>${s.board}</b> · Dealer ${SEATS[s.dealer][0]}</span><strong>${s.contract?`${s.contract.level}${SYMBOLS[s.contract.suit]}${s.contract.doubled===2?' X':s.contract.doubled===4?' XX':''} · ${SEATS[s.contract.declarer]}`:'Auction'}</strong><span>N/S ${s.tricks[0]} : ${s.tricks[1]} E/W</span><small>${s.vulnerable.every(Boolean)?'Both vulnerable':s.vulnerable[0]?'N/S vulnerable':s.vulnerable[1]?'E/W vulnerable':'Neither vulnerable'}</small></div>${s.phase==='complete'?recap():s.phase==='bidding'?auction()+bidding():playing()}${s.phase==='complete'?'':`<section class="your-hand ${view.controller===view.you&&s.turn===view.you?'active':''}"><div><strong>${SEATS[view.you]} · Your hand${s.contract?.dummy===view.you?' · Dummy':''}</strong><small>${hcp(s.hands[view.you])} HCP</small></div>${cards(s.hands[view.you],view.you)}<p>${s.phase==='bidding'?'Choose a level, then a suit or NT.':s.contract?.dummy===view.you?'Declarer plays your dummy hand.':view.controller===view.you&&s.turn!==view.you?'Choose a card from dummy.':'Tap a highlighted card on your turn.'}</p></section>`}`}</div><footer><span>Session N/S ${signed(view.totals[0])}</span>${s?.phase==='complete'&&view.host?'<button id="replay">Play again</button><button id="next" class="primary">Next board</button>':''}${s?.phase==='play'?'<button id="auction-toggle">Auction</button>':''}<button id="leave">Leave</button></footer></div>`;
+ app.innerHTML=`<div class="game"><div class="status ${!waiting&&view.controller===view.you?'your-turn':''}" role="status">${escape(status)}</div>${view.host&&view.players.some(p=>!p.bot&&!p.connected)?`<div class="reconnect">${view.players.filter(p=>!p.bot&&!p.connected).map(p=>`<p>${escape(p.name)} disconnected. <button data-replace="${p.seat}">Replace with bot</button></p>`).join('')}</div>`:''}<div class="game-scroll">${!s?lobby():`<div class="board-meta"><span>Board <b>${s.board}</b> · Dealer ${SEATS[s.dealer][0]}</span><strong>${s.contract?`${s.contract.level}${SYMBOLS[s.contract.suit]}${s.contract.doubled===2?' X':s.contract.doubled===4?' XX':''} · ${SEATS[s.contract.declarer]}`:'Auction'}</strong><span>N/S ${s.tricks[0]} : ${s.tricks[1]} E/W</span><small>${s.vulnerable.every(Boolean)?'Both vulnerable':s.vulnerable[0]?'N/S vulnerable':s.vulnerable[1]?'E/W vulnerable':'Neither vulnerable'}</small></div>${s.phase==='complete'?recap():s.phase==='bidding'?auction()+bidding():playing()}${s.phase==='complete'?'':mainHand()}`}</div><footer><span>Session N/S ${signed(view.totals[0])}</span>${s?.phase==='complete'&&view.host?'<button id="replay">Play again</button><button id="next" class="primary">Next board</button>':''}${s?.phase==='play'?'<button id="auction-toggle">Auction</button>':''}<button id="leave">Leave</button></footer></div>`;
  app.querySelectorAll('[data-seat]').forEach(b=>b.onclick=()=>action({type:'seat',seat:Number(b.dataset.seat)}));
  app.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{native({type:'copy',text:invites[Number(b.dataset.copy)]});notice('Invitation code copied. Share it with just this player.');});
  app.querySelectorAll('[data-share]').forEach(b=>b.onclick=()=>native({type:'share',text:invites[Number(b.dataset.share)]}));
@@ -120,7 +131,7 @@ window.bridgeNativeEvent=event=>{
      publish();
     }else if(event.payload?.kind==='view'){
      const next=event.payload.view;
-     if(next?.protocol!==1||!Number.isInteger(next.you)||next.you<0||next.you>3||!Array.isArray(next.players)||next.players.length!==4)throw Error('Incompatible nearby table.');
+     if(next?.protocol!==NEARBY_PROTOCOL||!Number.isInteger(next.you)||next.you<0||next.you>3||!Array.isArray(next.players)||next.players.length!==4)throw Error('Update Bridge Room on every device to play together.');
      view=next;connected=true;pending=false;mode='table';level=null;render();
     }else if(event.payload?.kind==='error'){pending=false;notice(event.payload.message);render();}
     break;

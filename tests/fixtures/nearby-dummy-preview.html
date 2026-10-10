@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+ <title>Nearby Bridge · Dummy Scenario</title>
+ <link rel="stylesheet" href="/native/web/nearby.css">
+ <style>.test-scenario-label{flex-shrink:0;background:#e4ae45;color:#241a06;text-align:center;font:10px/18px system-ui,sans-serif;letter-spacing:.02em}#test-scenario-diagnostics{flex-shrink:0;background:#f7e6bf;color:#352b17;padding:2px 5px;font:9px/12px monospace;overflow-wrap:anywhere}</style>
+</head>
+<body>
+ <div class="test-scenario-label">TEST SCENARIO · human dummy / bot declarer · not iOS networking</div>
+ <output id="test-scenario-diagnostics" aria-label="Scenario diagnostics" hidden>Loading test scenario…</output>
+ <header><span class="brand">♠ The Bridge Room</span><span id="connection" role="status">Nearby play</span></header>
+ <main id="app"></main><div id="notice" role="alert" hidden></div>
+ <dialog id="meaning"><div class="dialog-heading"><h2 id="meaning-title">Bid meaning</h2><button id="close-meaning" aria-label="Close explanation">×</button></div><p id="meaning-text"></p></dialog>
+ <script type="module" src="nearby-dummy-preview.js"></script>
+</body>
+</html>

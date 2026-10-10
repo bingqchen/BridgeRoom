@@ -8,7 +8,7 @@ import CryptoKit
 final class NearbyTransport {
     static let maximumFrame = 256 * 1024
     private static let service = "_bridgeroom._tcp"
-    private static let protocolVersion = 1
+    private static let protocolVersion = 2
     var onEvent: (([String: Any]) -> Void)?
 
     private final class Channel {
@@ -289,8 +289,10 @@ final class NearbyTransport {
             return
         }
         if hostID != nil, channel.peerID == nil {
-            guard message["type"] as? String == "hello", message["version"] as? Int == Self.protocolVersion,
-                  let id = message["id"] as? String, Self.isHex(id, count: 64),
+            guard message["type"] as? String == "hello", message["version"] as? Int == Self.protocolVersion else {
+                return reject(channel, message: "Update Bridge Room on every device to play together.")
+            }
+            guard let id = message["id"] as? String, Self.isHex(id, count: 64),
                   let invite = message["invite"] as? String, invites.contains(invite),
                   let name = message["name"] as? String, name.utf8.count <= 160,
                   inviteOwners[invite] == nil || inviteOwners[invite] == id,
@@ -314,7 +316,10 @@ final class NearbyTransport {
                 close(channel); return
             }
             guard message["type"] as? String == "welcome", message["version"] as? Int == Self.protocolVersion,
-                  message["id"] as? String == playerID else { return close(channel, reason: "The table uses an incompatible protocol.") }
+                  message["id"] as? String == playerID else {
+                endpoint = nil; guestCode = nil
+                return close(channel, reason: "Update Bridge Room on every device to play together.")
+            }
             channel.peerID = "host"; channel.deadline?.cancel(); channel.deadline = nil
             guestWelcomed = true; retryCount = 0
             emit(["type": "joined", "id": playerID])

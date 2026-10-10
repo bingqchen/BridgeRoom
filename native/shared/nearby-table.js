@@ -1,6 +1,7 @@
 import {createDeal,makeCall,playCard,collectTrick,botBid,botCard,legalCalls,legalCards} from '../../dist/engine.js';
 import {replayDeal} from '../../dist/session.js';
 
+export const NEARBY_PROTOCOL=2;
 const copy=value=>structuredClone(value);
 const cleanName=value=>String(value||'Player').replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,28)||'Player';
 
@@ -32,7 +33,13 @@ export class NearbyTable {
  setActive(active){if(this.active!==Boolean(active)){this.active=Boolean(active);this.revision++;}}
  controller(){
   const s=this.state;if(!s||s.phase==='complete'||s.trick.length===4)return null;
-  return s.phase==='play'&&s.turn===s.contract.dummy?s.contract.declarer:s.turn;
+  if(s.phase==='play'){
+   const {declarer,dummy}=s.contract;
+   // A human declarer retains control. With a bot declarer, its human dummy
+   // plays both partnership hands, just as in solo practice.
+   if(s.turn===declarer||s.turn===dummy)return !this.players[declarer]&&this.players[dummy]?dummy:declarer;
+  }
+  return s.turn;
  }
  recordScore(){
   if(this.state?.phase!=='complete'||this.scoredState===this.state)return;
@@ -73,7 +80,7 @@ export class NearbyTable {
    case 'bid':
    case 'play':
     if(!this.started||this.paused||!this.players[seat].connected)throw Error('The table is paused.');
-    if(this.controller()!==seat)throw Error('It is not your turn. Declarer plays dummy.');
+    if(this.controller()!==seat)throw Error('It is not your turn to play this hand.');
     if(action.type==='bid')makeCall(this.state,action.bid);
     else playCard(this.state,action.cardId);
     break;
@@ -99,11 +106,12 @@ export class NearbyTable {
    state={board:s.board,dealer:s.dealer,vulnerable:s.vulnerable,phase:s.phase,turn:s.turn,
     contract:s.contract,trick:s.trick,history:s.history,auction:s.auction,tricks:s.tricks,
     dummyExposed:s.dummyExposed,result:s.result,counts:s.hands.map(h=>h.length),
-    hands:s.hands.map((h,seat)=>complete||seat===you||s.dummyExposed&&seat===s.contract?.dummy?h:null),
+    hands:s.hands.map((h,seat)=>complete||seat===you||s.dummyExposed&&
+     (seat===s.contract?.dummy||you===s.contract?.dummy&&seat===s.contract.declarer)?h:null),
     ...(complete?{originalHands:s.originalHands}:{})};
   }
   const canAct=s&&!this.paused&&controller===you;
-  return copy({protocol:1,revision:this.revision,you,host:id===this.hostId,started:this.started,paused:this.paused,
+  return copy({protocol:NEARBY_PROTOCOL,revision:this.revision,you,host:id===this.hostId,started:this.started,paused:this.paused,
    players:this.players.map((p,seat)=>({seat,name:p?.name||'Bot',bot:!p,connected:p?.connected??true})),
    state,controller,totals:this.totals,
    legalCalls:canAct&&s.phase==='bidding'?legalCalls(s.auction,s.turn):[],
